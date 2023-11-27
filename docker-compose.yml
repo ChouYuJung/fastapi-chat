@@ -1,0 +1,19 @@
+---
+version: "3"
+services:
+  fastapi-app-service:
+    image: fastapi-app:${FASTAPI_APP_VERSION:-latest}
+    container_name: fastapi-app-service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8880:80"
+    networks:
+      - fastapi-network
+    volumes:
+      - ./app:/app
+    tty: true
+networks:
+  fastapi-network:
+    name: fastapi-network
