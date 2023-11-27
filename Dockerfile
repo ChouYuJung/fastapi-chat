@@ -5,7 +5,7 @@ LABEL maintainer="dockhardman <f1470891079@gmail.com>"
 # Install System Dependencies
 RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends \
-    git nano vim wget curl htop ca-certificates && \
+    git nano vim wget curl htop ca-certificates build-essential && \
     python -m pip install --upgrade pip
 
 # Install Poetry
