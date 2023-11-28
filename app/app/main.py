@@ -1,5 +1,8 @@
+from typing import Annotated
+
 from app.utils.common import get_system_info
-from fastapi import FastAPI
+from app.utils.oauth import oauth2_scheme
+from fastapi import Depends, FastAPI
 
 
 def create_app():
@@ -14,7 +17,7 @@ def create_app():
         return {"status": "OK"}
 
     @app.get("/stats")
-    async def stats():
+    async def stats(token: Annotated[str, Depends(oauth2_scheme)]):
         return get_system_info()
 
     return app
