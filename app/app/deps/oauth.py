@@ -1,7 +1,6 @@
 from typing import Annotated
 
-from app.schemas.oauth import fake_decode_token
-from app.utils.oauth import oauth2_scheme
+from app.utils.oauth import fake_decode_token, oauth2_scheme
 from fastapi import Depends
 
 
