@@ -9,5 +9,7 @@ class Settings(BaseSettings):
     app_name: Text = "fastapi-app-service"
     app_version: Text = VERSION
 
+    token_url: Text = "token"
+
 
 settings = Settings()
