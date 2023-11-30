@@ -1,7 +1,10 @@
+import json
 import platform
-from typing import Dict
+from datetime import date, datetime
+from typing import Any, Dict, Union
 
 import psutil
+from app.schemas import JSONSerializable
 
 
 def get_system_info(cpu_percent_interval: int = 1) -> Dict:
@@ -34,3 +37,20 @@ def get_system_info(cpu_percent_interval: int = 1) -> Dict:
     system_info = {"operating_system": os_info, "cpu": cpu_info, "memory": memory_info}
 
     return system_info
+
+
+def is_json_serializable(obj: Union[JSONSerializable, Any]) -> bool:
+    """Check if an object is JSON serializable."""
+
+    try:
+        json.dumps(obj, cls=DateTimeEncoder)
+        return True
+    except TypeError:
+        return False
+
+
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        return super(DateTimeEncoder, self).default(obj)

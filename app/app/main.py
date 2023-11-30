@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from typing import Annotated
 
@@ -5,9 +6,9 @@ from app.config import settings
 from app.db.users import fake_users_db
 from app.deps.oauth import get_current_active_user
 from app.schemas.oauth import Token, User
-from app.utils.common import get_system_info
+from app.utils.common import get_system_info, is_json_serializable
 from app.utils.oauth import authenticate_user, create_access_token, oauth2_scheme
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 
@@ -21,6 +22,19 @@ def create_app():
     @app.get("/health")
     async def health():
         return {"status": "OK"}
+
+    @app.get("/echo")
+    async def echo(request: Request):
+        body = await request.body()
+        return {
+            "url": str(request.url),
+            "method": request.method,
+            "client": request.client.host,
+            "query_params": dict(request.query_params),
+            "body": json.loads(body) if is_json_serializable(body) else "",
+            "headers": dict(request.headers),
+            "cookies": request.cookies,
+        }
 
     @app.get("/stats")
     async def stats(token: Annotated[str, Depends(oauth2_scheme)]):
