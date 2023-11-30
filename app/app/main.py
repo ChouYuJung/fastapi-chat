@@ -1,12 +1,13 @@
+from datetime import timedelta
 from typing import Annotated
 
 from app.config import settings
-from app.db.users import UserInDB, fake_users_db
+from app.db.users import fake_users_db
 from app.deps.oauth import get_current_active_user
-from app.schemas.oauth import User
+from app.schemas.oauth import Token, User
 from app.utils.common import get_system_info
-from app.utils.oauth import fake_hash_password, oauth2_scheme
-from fastapi import Depends, FastAPI, HTTPException
+from app.utils.oauth import authenticate_user, create_access_token, oauth2_scheme
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 
@@ -25,21 +26,22 @@ def create_app():
     async def stats(token: Annotated[str, Depends(oauth2_scheme)]):
         return get_system_info()
 
-    @app.post("/token")
-    async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
-        user_dict = fake_users_db.get(form_data.username)
-        if not user_dict:
+    @app.post("/token", response_model=Token)
+    async def login_for_access_token(
+        form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
+    ):
+        user = authenticate_user(fake_users_db, form_data.username, form_data.password)
+        if not user:
             raise HTTPException(
-                status_code=400, detail="Incorrect username or password"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
             )
-        user = UserInDB(**user_dict)
-        hashed_password = fake_hash_password(form_data.password)
-        if not hashed_password == user.hashed_password:
-            raise HTTPException(
-                status_code=400, detail="Incorrect username or password"
-            )
-
-        return {"access_token": user.username, "token_type": "bearer"}
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.username}, expires_delta=access_token_expires
+        )
+        return {"access_token": access_token, "token_type": "bearer"}
 
     @app.get("/users/me")
     async def read_users_me(

@@ -3,20 +3,13 @@ from typing import Text
 from app.schemas.oauth import UserInDB
 
 fake_users_db = {
-    "johndoe": {
-        "username": "johndoe",
-        "full_name": "John Doe",
-        "email": "johndoe@example.com",
-        "hashed_password": "fake-hashed-secret",
+    "dockhardman": {
+        "username": "dockhardman",
+        "full_name": "Dock Hardman",
+        "email": "dockhardman@example.com",
+        "hashed_password": "$2b$12$gp/ReAVXdF.95QBY1dJY2.xuVeXuDToXtDWxxGaktMjTRQiYyOhXa",
         "disabled": False,
-    },
-    "alice": {
-        "username": "alice",
-        "full_name": "Alice Wonderson",
-        "email": "alice@example.com",
-        "hashed_password": "fake-hashed-secret2",
-        "disabled": True,
-    },
+    }
 }
 
 

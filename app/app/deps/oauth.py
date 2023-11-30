@@ -8,18 +8,16 @@ from fastapi import Depends, HTTPException, status
 from jose import JWTError, jwt
 
 
-async def get_current_user(
-    token: Annotated[Text, Depends(oauth2_scheme)],
-    key: Text = settings.SECRET_KEY,
-    algorithm: Text = settings.ALGORITHM,
-):
+async def get_current_user(token: Annotated[Text, Depends(oauth2_scheme)]):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, key, algorithms=[algorithm])
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         username: Text = payload.get("sub")
         if username is None:
             raise credentials_exception

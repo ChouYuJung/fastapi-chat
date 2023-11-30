@@ -16,9 +16,7 @@ class TokenData(BaseModel):
     username: Optional[Text] = None
 
 
-class User(
-    BaseModel,
-):
+class User(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     username: Text = Field(..., min_length=4, max_length=32, pattern="^[a-zA-Z0-9_-]+$")

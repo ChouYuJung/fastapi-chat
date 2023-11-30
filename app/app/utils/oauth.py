@@ -3,6 +3,7 @@ from typing import Dict, Optional, Text
 
 from app.config import settings
 from app.db.users import fake_users_db, get_user
+from app.schemas.oauth import UserInDB
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
 from passlib.context import CryptContext
@@ -21,12 +22,21 @@ def fake_hash_password(password: Text):
     return "fake-hashed-" + password
 
 
-def verify_password(plain_password, hashed_password):
+def verify_password(plain_password: Text, hashed_password: Text) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password):
     return pwd_context.hash(password)
+
+
+def authenticate_user(fake_db, username: Text, password: Text) -> Optional["UserInDB"]:
+    user = get_user(fake_db, username)
+    if not user:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
+    return user
 
 
 def create_access_token(
