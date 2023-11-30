@@ -1,3 +1,4 @@
+import time
 from typing import Annotated, Text
 
 from app.config import settings
@@ -14,13 +15,21 @@ async def get_current_user(token: Annotated[Text, Depends(oauth2_scheme)]):
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    token_expired_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Token expired",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         username: Text = payload.get("sub")
+        expires: int = payload.get("exp")
         if username is None:
             raise credentials_exception
+        if time.time() > expires:
+            raise token_expired_exception
         token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
