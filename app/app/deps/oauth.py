@@ -1,18 +1,34 @@
-from typing import Annotated
+from typing import Annotated, Text
 
-from app.schemas.oauth import User
-from app.utils.oauth import fake_decode_token, oauth2_scheme
+from app.config import settings
+from app.db.users import fake_users_db, get_user
+from app.schemas.oauth import TokenData, User
+from app.utils.oauth import oauth2_scheme
 from fastapi import Depends, HTTPException, status
+from jose import JWTError, jwt
 
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
-    user = fake_decode_token(token)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+async def get_current_user(
+    token: Annotated[Text, Depends(oauth2_scheme)],
+    key: Text = settings.SECRET_KEY,
+    algorithm: Text = settings.ALGORITHM,
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, key, algorithms=[algorithm])
+        username: Text = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    user = get_user(fake_users_db, username=token_data.username)
+    if user is None:
+        raise credentials_exception
     return user
 
 
