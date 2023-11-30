@@ -3,8 +3,22 @@ from typing import Optional, Text
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
-# Strip any space
-class User(BaseModel):
+class Token(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    access_token: Text
+    token_type: Text
+
+
+class TokenData(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    username: Optional[Text] = None
+
+
+class User(
+    BaseModel,
+):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     username: Text = Field(..., min_length=4, max_length=32, pattern="^[a-zA-Z0-9_-]+$")

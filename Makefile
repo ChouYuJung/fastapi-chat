@@ -11,3 +11,9 @@ upgrade-deps:
 
 format-code:
 	isort . && black .
+
+create-secret-key:
+	openssl rand -hex 32
+
+test-make:
+	echo "make test"
