@@ -8,6 +8,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "~3.10"
+cryptography = "^41.0.7"
 fastapi = {extras = ["all"], version = "^0.104.1"}
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 psutil = "^5.9.6"

@@ -1,6 +1,6 @@
 annotated-types==0.6.0 ; python_version >= "3.10" and python_version < "3.11"
 anyio==3.7.1 ; python_version >= "3.10" and python_version < "3.11"
-bcrypt==4.0.1 ; python_version >= "3.10" and python_version < "3.11"
+bcrypt==4.1.1 ; python_version >= "3.10" and python_version < "3.11"
 certifi==2023.11.17 ; python_version >= "3.10" and python_version < "3.11"
 cffi==1.16.0 ; python_version >= "3.10" and python_version < "3.11"
 click==8.1.7 ; python_version >= "3.10" and python_version < "3.11"
