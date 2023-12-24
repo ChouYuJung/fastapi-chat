@@ -9,15 +9,16 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "~3.10"
 cryptography = "^41.0.7"
-fastapi = {extras = ["all"], version = "^0.104.1"}
-passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+fastapi = { extras = ["all"], version = "^0.104.1" }
+passlib = { extras = ["bcrypt"], version = "^1.7.4" }
 psutil = "^5.9.6"
-pydantic = {extras = ["email"], version = "^2.5.2"}
+pydantic = { extras = ["email"], version = "^2.5.2" }
 pydantic-settings = "^2.1.0"
-python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+python-jose = { extras = ["cryptography"], version = "^3.3.0" }
 pytz = "^2023.3.post1"
 rich = "^13.7.0"
-uvicorn = {extras = ["standard"], version = "^0.24.0.post1"}
+uvicorn = { extras = ["standard"], version = "^0.24.0.post1" }
+colorama = "^0.4.6"
 
 [tool.poetry.extras]
 all = []
