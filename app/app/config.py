@@ -62,6 +62,8 @@ class ColoredIsoDatetimeFormatter(IsoDatetimeFormatter):
                 self.COLORS[levelname] + f"{levelname:8s}" + Style.RESET_ALL
             )
             record.name = Fore.BLUE + record.name + Style.RESET_ALL
+            if not isinstance(record.msg, Text):
+                record.msg = str(record.msg)
             if levelname in self.MSG_COLORS:
                 record.msg = self.COLORS[levelname] + record.msg + Style.RESET_ALL
         return super(ColoredIsoDatetimeFormatter, self).format(record)
