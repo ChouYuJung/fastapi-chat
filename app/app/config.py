@@ -1,6 +1,7 @@
 import logging
 import logging.config
 from datetime import datetime
+from pathlib import Path
 from typing import Text
 
 import pytz
@@ -15,6 +16,8 @@ init(autoreset=True)
 class Settings(BaseSettings):
     app_name: Text = "fastapi-app-service"
     app_version: Text = VERSION
+    logging_level: Text = "DEBUG"
+    logs_dir: Text = "logs"
 
     # OAuth2
     token_url: Text = "token"
@@ -26,6 +29,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+if not Path(settings.logs_dir).exists():
+    Path(settings.logs_dir).mkdir(parents=True)
 
 
 class IsoDatetimeFormatter(logging.Formatter):
@@ -79,18 +84,40 @@ def default_logging_config():
                 "format": "%(asctime)s %(levelname)-8s %(name)s  - %(message)s",
             },
             "message_formatter": {"format": "%(message)s"},
+            "file_formatter": {
+                "()": IsoDatetimeFormatter,
+                "format": "%(asctime)s %(levelname)-8s %(name)s  - %(message)s",
+            },
         },
         "handlers": {
             "console_handler": {
                 "level": "DEBUG",
                 "class": "logging.StreamHandler",
                 "formatter": "basic_formatter",
-            }
+            },
+            "file_handler": {
+                "level": settings.logging_level,
+                "class": "logging.handlers.RotatingFileHandler",
+                "filename": Path(settings.logs_dir)
+                .joinpath(f"{settings.app_name}.log")
+                .resolve(),
+                "formatter": "file_formatter",
+                "maxBytes": 2097152,
+                "backupCount": 20,
+            },
+            "error_handler": {
+                "level": "WARNING",
+                "class": "logging.FileHandler",
+                "filename": Path(settings.logs_dir)
+                .joinpath(f"{settings.app_name}.error.log")
+                .resolve(),
+                "formatter": "file_formatter",
+            },
         },
         "loggers": {
             settings.app_name: {
                 "level": "DEBUG",
-                "handlers": ["console_handler"],
+                "handlers": ["file_handler", "error_handler", "console_handler"],
                 "propagate": True,
             }
         },
