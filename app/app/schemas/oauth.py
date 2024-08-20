@@ -1,4 +1,4 @@
-from typing import Optional, Text
+from typing import Literal, Optional, Text
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -27,3 +27,8 @@ class User(BaseModel):
 
 class UserInDB(User):
     hashed_password: Text
+
+
+class LoginResponse(BaseModel):
+    access_token: Text
+    token_type: Literal["bearer"]
