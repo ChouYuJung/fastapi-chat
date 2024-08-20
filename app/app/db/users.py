@@ -7,7 +7,7 @@ fake_users_db = {
         "username": "dockhardman",
         "full_name": "Dock Hardman",
         "email": "dockhardman@example.com",
-        "hashed_password": "$2b$12$gp/ReAVXdF.95QBY1dJY2.xuVeXuDToXtDWxxGaktMjTRQiYyOhXa",
+        "hashed_password": "$2b$12$vju9EMyn.CE80h88pErZNuSC.0EZOH/rqw2RpCLdCeEVLRPfhDlYS",  # 'pass1234', ignore E501
         "disabled": False,
     }
 }

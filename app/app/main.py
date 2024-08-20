@@ -56,7 +56,7 @@ def create_app():
     @app.get("/users/me")
     async def read_users_me(
         current_user: Annotated[User, Depends(get_current_active_user)]
-    ):
+    ) -> User:
         return current_user
 
     from .api.router import router as api_router
