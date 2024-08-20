@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Dict, Optional, Text
 
 from app.config import settings
@@ -33,9 +33,9 @@ def get_password_hash(password):
 def authenticate_user(fake_db, username: Text, password: Text) -> Optional["UserInDB"]:
     user = get_user(fake_db, username)
     if not user:
-        return False
+        return None
     if not verify_password(password, user.hashed_password):
-        return False
+        return None
     return user
 
 
@@ -47,9 +47,9 @@ def create_access_token(
 ):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.now(UTC) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, key, algorithm=algorithm)
     return encoded_jwt

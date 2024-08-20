@@ -6,8 +6,8 @@ from app.config import settings
 from app.db.users import fake_users_db
 from app.deps.oauth import get_current_active_user
 from app.schemas.oauth import Token, User
-from app.utils.common import get_system_info, is_json_serializable
-from app.utils.oauth import authenticate_user, create_access_token, oauth2_scheme
+from app.utils.common import is_json_serializable
+from app.utils.oauth import authenticate_user, create_access_token
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -35,10 +35,6 @@ def create_app():
             "headers": dict(request.headers),
             "cookies": request.cookies,
         }
-
-    @app.get("/stats")
-    async def stats(token: Annotated[str, Depends(oauth2_scheme)]):
-        return get_system_info()
 
     @app.post("/token", response_model=Token)
     async def login_for_access_token(

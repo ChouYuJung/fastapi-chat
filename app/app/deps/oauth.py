@@ -24,14 +24,16 @@ async def get_current_user(token: Annotated[Text, Depends(oauth2_scheme)]):
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-        username: Text = payload.get("sub")
-        expires: int = payload.get("exp")
+        username: Text = payload.get("sub")  # type: ignore
+        expires: int = payload.get("exp")  # type: ignore
         if username is None:
             raise credentials_exception
         if time.time() > expires:
             raise token_expired_exception
         token_data = TokenData(username=username)
     except JWTError:
+        raise credentials_exception
+    if token_data.username is None:
         raise credentials_exception
     user = get_user(fake_users_db, username=token_data.username)
     if user is None:
