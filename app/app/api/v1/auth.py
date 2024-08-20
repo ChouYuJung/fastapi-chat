@@ -6,7 +6,7 @@ from app.db.users import fake_users_db
 from app.deps.oauth import get_current_active_user
 from app.schemas.oauth import LoginResponse, Token, User
 from app.utils.oauth import authenticate_user, create_access_token, invalidate_token
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
@@ -19,11 +19,6 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: Text
     full_name: Text
-
-
-class UserLogin(BaseModel):
-    username: Text
-    password: Text
 
 
 class RefreshToken(BaseModel):
@@ -59,7 +54,9 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> LoginRespon
 
 @router.post("/logout")
 async def logout(current_user: Annotated[User, Depends(get_current_active_user)]):
-    """Invalidate the token for the given user."""
+    """Invalidate the token for the given user.
+    TODO: Implement logout to invalidate the token.
+    """
 
     invalidate_token(current_user.username)
     return JSONResponse(
@@ -73,7 +70,17 @@ async def logout(current_user: Annotated[User, Depends(get_current_active_user)]
 
 
 @router.post("/refresh-token", response_model=Token)
-async def refresh_token(refresh_token: RefreshToken = Body(...)):
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented"
+async def refresh_token(
+    current_user: Annotated[User, Depends(get_current_active_user)]
+):
+    """Refresh the access token for the current user.
+    TODO: Implement refresh token to invalidate the old token and return a new token.
+    """
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    new_access_token = create_access_token(
+        data={"sub": current_user.username}, expires_delta=access_token_expires
+    )
+    return LoginResponse.model_validate(
+        {"access_token": new_access_token, "token_type": "bearer"}
     )
