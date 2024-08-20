@@ -49,3 +49,9 @@ def create_access_token(
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, key, algorithm=algorithm)
     return encoded_jwt
+
+
+def invalidate_token(user_name: Text):
+    """Invalidate the token for the given user."""
+
+    pass  # Not implemented yet

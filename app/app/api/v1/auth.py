@@ -1,11 +1,13 @@
 from datetime import timedelta
-from typing import Text
+from typing import Annotated, Text
 
 from app.config import settings
 from app.db.users import fake_users_db
-from app.schemas.oauth import LoginResponse, Token
-from app.utils.oauth import authenticate_user, create_access_token
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from app.deps.oauth import get_current_active_user
+from app.schemas.oauth import LoginResponse, Token, User
+from app.utils.oauth import authenticate_user, create_access_token, invalidate_token
+from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 
@@ -56,9 +58,17 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> LoginRespon
 
 
 @router.post("/logout")
-async def logout(token: Text = Query(...)):
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented"
+async def logout(current_user: Annotated[User, Depends(get_current_active_user)]):
+    """Invalidate the token for the given user."""
+
+    invalidate_token(current_user.username)
+    return JSONResponse(
+        content={"message": "Successfully logged out"},
+        status_code=status.HTTP_200_OK,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, private",
+            "Pragma": "no-cache",
+        },
     )
 
 
