@@ -29,7 +29,7 @@ def create_app():
         return {
             "url": str(request.url),
             "method": request.method,
-            "client": request.client.host,
+            "client": request.client.host if request.client else "",
             "query_params": dict(request.query_params),
             "body": json.loads(body) if is_json_serializable(body) else "",
             "headers": dict(request.headers),
@@ -62,6 +62,10 @@ def create_app():
         current_user: Annotated[User, Depends(get_current_active_user)]
     ):
         return current_user
+
+    from .api.router import router as api_router
+
+    app.include_router(api_router, prefix="/api")
 
     return app
 
