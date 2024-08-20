@@ -4,6 +4,7 @@ from app.schemas.oauth import UserInDB
 
 fake_users_db = {
     "admin": {
+        "id": "01917074-e006-7df3-b00b-d5daa3631291",
         "username": "admin",
         "full_name": "Admin User",
         "email": "admin@example.com",

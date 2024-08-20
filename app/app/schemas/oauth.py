@@ -19,6 +19,7 @@ class TokenData(BaseModel):
 class User(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
+    id: Text = Field(..., description="User ID in UUID Version 7 format")
     username: Text = Field(..., min_length=4, max_length=32, pattern="^[a-zA-Z0-9_-]+$")
     email: EmailStr
     full_name: Optional[Text] = None
