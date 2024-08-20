@@ -19,6 +19,7 @@ python-jose = { extras = ["cryptography"], version = "*" }
 pytz = "*"
 rich = "*"
 uvicorn = { extras = ["standard"], version = "*" }
+uuid-utils = "*"
 
 [tool.poetry.extras]
 all = []
