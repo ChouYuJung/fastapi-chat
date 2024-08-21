@@ -18,7 +18,7 @@ def verify_password(plain_password: Text, hashed_password: Text) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def get_password_hash(password):
+def get_password_hash(password: Text | bytes) -> Text:
     """Get the password hash for the given password."""
     return pwd_context.hash(password)
 
@@ -49,12 +49,6 @@ def create_access_token(
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, key, algorithm=algorithm)
     return encoded_jwt
-
-
-def invalidate_token(user_name: Text):
-    """Invalidate the token for the given user."""
-
-    pass  # Not implemented yet
 
 
 def verify_token(token: Text) -> Optional[Dict]:

@@ -2,16 +2,21 @@ from datetime import timedelta
 from typing import Annotated, Text
 
 from app.config import settings
-from app.db.users import fake_users_db
+from app.db.tokens import fake_token_blacklist, invalidate_token
+from app.db.users import create_user, fake_users_db
 from app.deps.oauth import get_current_active_user
 from app.schemas.oauth import Token, User, UserGuestRegister
-from app.utils.oauth import authenticate_user, create_access_token, invalidate_token
+from app.utils.oauth import (
+    authenticate_user,
+    create_access_token,
+    get_password_hash,
+    oauth2_scheme,
+    verify_token,
+)
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
-from app.db.users import create_user
-from app.utils.oauth import get_password_hash
 
 router = APIRouter()
 
@@ -78,12 +83,21 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
 
 
 @router.post("/logout")
-async def logout(current_user: Annotated[User, Depends(get_current_active_user)]):
-    """Invalidate the token for the given user.
-    TODO: Implement logout to invalidate the token.
-    """
+async def logout(token: Annotated[Text, Depends(oauth2_scheme)]):
+    """Invalidate the token for the given user."""
 
-    invalidate_token(current_user.username)
+    # Verify the token and invalidate it.
+    payload = verify_token(token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Invalidate the token.
+    invalidate_token(fake_token_blacklist, token=token)
+
     return JSONResponse(
         content={"message": "Successfully logged out"},
         status_code=status.HTTP_200_OK,

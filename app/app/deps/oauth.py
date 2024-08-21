@@ -2,6 +2,7 @@ import time
 from typing import Annotated, List, Text
 
 from app.config import settings
+from app.db.tokens import fake_token_blacklist, is_token_invalid
 from app.db.users import fake_users_db, get_user
 from app.schemas.oauth import Role, TokenData, User
 from app.utils.oauth import oauth2_scheme, verify_token
@@ -20,6 +21,12 @@ async def get_current_user(token: Annotated[Text, Depends(oauth2_scheme)]):
         detail="Token expired",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # Check if token is inactivated
+    if token in fake_token_blacklist:
+        credentials_exception.detail = "Token has been invalidated"
+        raise credentials_exception
+
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
@@ -82,11 +89,19 @@ def RoleChecker(allowed_roles: List[Role]):
     """
 
     async def check_role(token: Text = Depends(oauth2_scheme)):
+        # Verify the token and check the user's role.
         payload = verify_token(token)
         if payload is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
             )
+        # Check if the token is in the blacklist.
+        if is_token_invalid(fake_token_blacklist, token=token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been invalidated",
+            )
+        # Check if the user's role is allowed.
         role = payload.get("role")
         if role not in allowed_roles:
             raise HTTPException(
