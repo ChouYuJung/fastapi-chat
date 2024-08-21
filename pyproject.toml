@@ -3,6 +3,7 @@ authors = ["Allen Chou <f1470891079@gmail.com>"]
 description = ""
 license = "MIT"
 name = "fastapi-chat"
+package-mode = false
 readme = "README.md"
 version = "0.1.0"
 
@@ -18,8 +19,8 @@ python = "^3.12"
 python-jose = { extras = ["cryptography"], version = "*" }
 pytz = "*"
 rich = "*"
-uvicorn = { extras = ["standard"], version = "*" }
 uuid-utils = "*"
+uvicorn = { extras = ["standard"], version = "*" }
 
 [tool.poetry.extras]
 all = []
