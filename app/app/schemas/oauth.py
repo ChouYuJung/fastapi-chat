@@ -32,7 +32,7 @@ class User(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, use_enum_values=True)
     id: Text = Field(..., description="User ID in UUID Version 7 format")
     username: Text = Field(..., min_length=4, max_length=32, pattern="^[a-zA-Z0-9_-]+$")
-    email: EmailStr
+    email: Optional[EmailStr] = Field(default=None)
     full_name: Optional[Text] = Field(default=None)
     role: Role
     disabled: bool = Field(default=False)
