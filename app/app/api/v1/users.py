@@ -1,15 +1,16 @@
 from typing import Annotated, Literal, Optional, Text
 
+from app.db.users import create_user as create_db_user
 from app.db.users import get_user_by_id
 from app.db.users import list_users as list_db_users
 from app.db.users import update_user as update_db_user
 from app.deps.oauth import RoleChecker, get_current_active_user
 from app.schemas.oauth import Role, User, UserCreate, UserUpdate
 from app.schemas.pagination import Pagination
+from app.utils.oauth import get_password_hash
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi import Path as QueryPath
 from fastapi import Query, status
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 router = APIRouter()
 
@@ -50,10 +51,34 @@ async def list_users(
     "/users",
     dependencies=[Depends(RoleChecker([Role.ADMIN]))],
 )
-async def create_user(user_create: UserCreate) -> User:
+async def create_user(
+    user_create: UserCreate = Body(
+        ...,
+        openapi_examples={
+            "guest_user": {
+                "summary": "Create a new guest user",
+                "value": {
+                    "username": "new_guest",
+                    "email": "guest@example.com",
+                    "password": "pass1234",
+                    "full_name": "New Guest User",
+                    "role": "viewer",
+                },
+            }
+        },
+    )
+) -> User:
     """Create a new user."""
 
-    return user
+    user = user_create.to_user()
+    created_user = create_db_user(
+        user=user, hashed_password=get_password_hash(user_create.password)
+    )
+    if created_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="User already exists"
+        )
+    return created_user
 
 
 @router.get(

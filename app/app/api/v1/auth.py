@@ -2,16 +2,14 @@ from datetime import timedelta
 from typing import Annotated, Text
 
 from app.config import settings
-from app.db.users import fake_users_db, get_user_by_id
-from app.db.users import list_users as list_db_users
-from app.db.users import update_user as update_db_user
+from app.db.users import fake_users_db
 from app.deps.oauth import get_current_active_user
-from app.schemas.oauth import Token, User
+from app.schemas.oauth import Token, User, UserGuestRegister
 from app.utils.oauth import authenticate_user, create_access_token, invalidate_token
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -21,7 +19,7 @@ class RefreshToken(BaseModel):
 
 
 @router.post("/register", response_model=Token)
-async def register(user: UserRegister = Body(...)) -> Token:
+async def register(user: UserGuestRegister = Body(...)) -> Token:
 
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented"

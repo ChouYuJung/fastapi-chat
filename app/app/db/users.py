@@ -3,7 +3,6 @@ from typing import Dict, Literal, Optional, Text
 
 from app.schemas.oauth import User, UserInDB
 from app.schemas.pagination import Pagination
-from app.utils.oauth import get_password_hash
 
 fake_users_db_init = MappingProxyType(
     {
@@ -115,7 +114,7 @@ def update_user(
 
 
 def create_user(
-    db=fake_users_db, *, user: "User", password: Text
+    db=fake_users_db, *, user: "User", hashed_password: Text
 ) -> Optional["UserInDB"]:
     """Create a new user in the database."""
 
@@ -123,7 +122,7 @@ def create_user(
         return None  # User already exists
     # Validate user data
     user_data = user.model_dump()
-    user_data["hashed_password"] = get_password_hash(password)
+    user_data["hashed_password"] = hashed_password
     user_db = UserInDB.model_validate(user_data)
     # Add user to the database
     db[user_db.username] = user_db.model_dump()
