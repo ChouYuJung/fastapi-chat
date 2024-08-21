@@ -4,7 +4,7 @@ from app.db.users import get_user_by_id
 from app.db.users import list_users as list_db_users
 from app.db.users import update_user as update_db_user
 from app.deps.oauth import RoleChecker, get_current_active_user
-from app.schemas.oauth import Role, User
+from app.schemas.oauth import Role, User, UserCreate, UserUpdate
 from app.schemas.pagination import Pagination
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi import Path as QueryPath
@@ -12,14 +12,6 @@ from fastapi import Query, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 router = APIRouter()
-
-
-class UserUpdate(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-    email: Optional[EmailStr] = Field(default=None)
-    full_name: Optional[Text] = Field(default=None)
-    role: Optional[Role] = Field(default=None)
-    disabled: Optional[bool] = Field(default=None)
 
 
 @router.get(
@@ -52,6 +44,16 @@ async def list_users(
             disabled=disabled, sort=sort, start=start, before=before, limit=limit
         ).model_dump()
     )
+
+
+@router.post(
+    "/users",
+    dependencies=[Depends(RoleChecker([Role.ADMIN]))],
+)
+async def create_user(user_create: UserCreate) -> User:
+    """Create a new user."""
+
+    return user
 
 
 @router.get(

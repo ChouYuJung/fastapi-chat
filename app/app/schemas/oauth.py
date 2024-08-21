@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Literal, Optional, Text
 
+import uuid_utils as uuid
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
@@ -42,6 +43,37 @@ class UserInDB(User):
     hashed_password: Text
 
 
-class LoginResponse(BaseModel):
-    access_token: Text
-    token_type: Literal["bearer"]
+class UserUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    email: Optional[EmailStr] = Field(default=None)
+    full_name: Optional[Text] = Field(default=None)
+    role: Optional[Role] = Field(default=None)
+    disabled: Optional[bool] = Field(default=None)
+
+
+class UserCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    username: Text
+    email: EmailStr
+    password: Text
+    full_name: Text
+    role: Role = Field(default=Role.VIEWER)
+
+    def to_user(
+        self, *, user_id: Optional[Text] = None, disabled: bool = False
+    ) -> User:
+        return User.model_validate(
+            {
+                "id": user_id or str(uuid.uuid7()),
+                "username": self.username,
+                "email": self.email,
+                "full_name": self.full_name,
+                "role": self.role,
+                "disabled": disabled,
+            }
+        )
+
+
+class UserGuestRegister(UserCreate):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    role: Literal[Role.VIEWER] = Field(default=Role.VIEWER)
