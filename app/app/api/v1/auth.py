@@ -10,6 +10,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
+from app.db.users import create_user
+from app.utils.oauth import get_password_hash
 
 router = APIRouter()
 
@@ -19,11 +21,41 @@ class RefreshToken(BaseModel):
 
 
 @router.post("/register", response_model=Token)
-async def register(user: UserGuestRegister = Body(...)) -> Token:
-
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented"
+async def register(
+    user_guest_register: UserGuestRegister = Body(
+        ...,
+        openapi_examples={
+            "guest_user": {
+                "summary": "Create a new guest user",
+                "value": {
+                    "username": "new_guest",
+                    "password": "pass1234",
+                    "full_name": "Guest User",
+                    "email": "guest@example.com",
+                },
+            },
+        },
     )
+) -> Token:
+    """Register a new user with the given username and password."""
+
+    # Create a new user with the given username and password.
+    user = user_guest_register.to_user()
+    created_user = create_user(
+        user=user, hashed_password=get_password_hash(user_guest_register.password)
+    )
+    if created_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="User already exists"
+        )
+
+    # Create an access token for the new user.
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": created_user.username, "role": created_user.role},
+        expires_delta=access_token_expires,
+    )
+    return Token.model_validate({"access_token": access_token, "token_type": "bearer"})
 
 
 @router.post("/login", response_model=Token)
