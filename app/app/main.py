@@ -1,9 +1,8 @@
 import json
-from typing import Annotated
 
 from app.config import settings
-from app.deps.oauth import get_current_active_user
-from app.schemas.oauth import User
+from app.deps.oauth import RoleChecker
+from app.schemas.oauth import Role
 from app.utils.common import is_json_serializable
 from fastapi import Depends, FastAPI, Request
 
@@ -19,7 +18,10 @@ def create_app():
     async def health():
         return {"status": "OK"}
 
-    @app.get("/echo")
+    @app.get(
+        "/echo",
+        dependencies=[Depends(RoleChecker([Role.ADMIN]))],
+    )
     async def echo(request: Request):
         body = await request.body()
         return {
@@ -31,12 +33,6 @@ def create_app():
             "headers": dict(request.headers),
             "cookies": request.cookies,
         }
-
-    @app.get("/users/me")
-    async def read_users_me(
-        current_user: Annotated[User, Depends(get_current_active_user)]
-    ) -> User:
-        return current_user
 
     from .api.router import router as api_router
 

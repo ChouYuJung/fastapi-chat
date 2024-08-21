@@ -1,7 +1,7 @@
 from typing import Annotated, Literal, Optional, Text
 
-from app.deps.oauth import get_current_active_user
-from app.schemas.oauth import User
+from app.deps.oauth import RoleChecker, get_current_active_user
+from app.schemas.oauth import Role, User
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi import Path as QueryPath
 from fastapi import Query, status
@@ -17,7 +17,10 @@ class UserUpdate(BaseModel):
     disabled: Optional[bool] = Field(default=None)
 
 
-@router.get("/users/me")
+@router.get(
+    "/users/me",
+    dependencies=[Depends(RoleChecker([Role.ADMIN, Role.CONTRIBUTOR, Role.VIEWER]))],
+)
 async def read_users_me(
     current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> User:

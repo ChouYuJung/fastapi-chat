@@ -19,14 +19,12 @@ ROLE_PERMISSIONS = {
 
 class Token(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
-
     access_token: Text
-    token_type: Text
+    token_type: Literal["bearer"] | Text
 
 
 class TokenData(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
-
     username: Optional[Text] = None
 
 
