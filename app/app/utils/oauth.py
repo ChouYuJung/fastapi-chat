@@ -5,7 +5,7 @@ from app.config import settings
 from app.db.users import get_user
 from app.schemas.oauth import UserInDB
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt
+from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -55,3 +55,15 @@ def invalidate_token(user_name: Text):
     """Invalidate the token for the given user."""
 
     pass  # Not implemented yet
+
+
+def verify_token(token: Text) -> Optional[Dict]:
+    """Verify the given token and return the payload if valid."""
+
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        return payload
+    except JWTError:
+        return None
