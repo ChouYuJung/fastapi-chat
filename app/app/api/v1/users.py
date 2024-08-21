@@ -1,5 +1,6 @@
 from typing import Annotated, Literal, Optional, Text
 
+from app.db.users import get_user_by_id
 from app.db.users import list_users as list_db_users
 from app.deps.oauth import RoleChecker, get_current_active_user
 from app.schemas.oauth import Role, User
@@ -51,16 +52,21 @@ async def list_users(
     )
 
 
-@router.get("/users/{user_id}")
+@router.get(
+    "/users/{user_id}",
+    dependencies=[Depends(RoleChecker([Role.ADMIN, Role.CONTRIBUTOR]))],
+)
 async def retrieve_user(
-    current_user: Annotated[User, Depends(get_current_active_user)],
     user_id: Text = QueryPath(..., min_length=4, max_length=64),
 ) -> User:
     """Retrieve user profile information."""
 
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented"
-    )
+    user = get_user_by_id(user_id=user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    return user
 
 
 @router.put("/users/{user_id}")

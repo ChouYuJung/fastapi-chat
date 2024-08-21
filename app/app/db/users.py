@@ -43,6 +43,12 @@ def get_user(db, username: Text):
         return UserInDB(**user_dict)
 
 
+def get_user_by_id(db=fake_users_db, *, user_id: Text) -> Optional["UserInDB"]:
+    for user in db.values():
+        if user["id"] == user_id:
+            return UserInDB.model_validate(user)
+
+
 def list_users(
     db=fake_users_db,
     *,
