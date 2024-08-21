@@ -37,9 +37,9 @@ This API is designed to be scalable, secure, and efficient, catering to the need
 
 ### 2. User Profile API (TODO)
 
+- GET /users/me: Retrieve the current user's profile information
 - GET /users/{userId}: Retrieve user profile information
 - PUT /users/{userId}: Update user profile information
-- GET /users/search: Search for users by username or other criteria
 
 ## Messaging APIs
 

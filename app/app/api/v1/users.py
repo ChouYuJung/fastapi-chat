@@ -26,25 +26,6 @@ async def read_users_me(
     return current_user
 
 
-@router.get("/users/search")
-async def search_users(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    username: Optional[Text] = Query(None, min_length=4, max_length=64),
-    email: Optional[Text] = Query(None, min_length=4, max_length=128),
-    full_name: Optional[Text] = Query(None, min_length=4, max_length=128),
-    disabled: Optional[bool] = Query(False),
-    sort: Literal["asc", "desc"] = Query("asc"),
-    start: Optional[Text] = Query(None),
-    before: Optional[Text] = Query(None),
-    limit: Optional[int] = Query(10, ge=1, le=100),
-):
-    """Search for users by username or other criteria."""
-
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented"
-    )
-
-
 @router.get("/users")
 async def list_users(
     current_user: Annotated[User, Depends(get_current_active_user)],

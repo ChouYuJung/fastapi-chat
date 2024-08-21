@@ -2,7 +2,7 @@ import logging
 import logging.config
 from datetime import datetime
 from pathlib import Path
-from typing import Text
+from typing import Literal, Text
 
 import pytz
 from colorama import Fore, Style, init
@@ -16,6 +16,7 @@ init(autoreset=True)
 class Settings(BaseSettings):
     app_name: Text = "fastapi-app-service"
     app_version: Text = VERSION
+    app_env: Literal["development", "production", "test"] | Text | None = "development"
     logging_level: Text = "DEBUG"
     logs_dir: Text = "logs"
 
@@ -27,8 +28,15 @@ class Settings(BaseSettings):
     ALGORITHM: Text = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    def validate_values(self):
+        if self.app_env not in ("development", "production", "test"):
+            raise ValueError(
+                "Value 'APP_ENV' must be one of 'development', 'production', 'test'"
+            )
+
 
 settings = Settings()
+settings.validate_values()
 if not Path(settings.logs_dir).exists():
     Path(settings.logs_dir).mkdir(parents=True)
 
