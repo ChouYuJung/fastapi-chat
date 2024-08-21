@@ -2,6 +2,7 @@ from typing import Annotated, Literal, Optional, Text
 
 from app.db.users import get_user_by_id
 from app.db.users import list_users as list_db_users
+from app.db.users import update_user as update_db_user
 from app.deps.oauth import RoleChecker, get_current_active_user
 from app.schemas.oauth import Role, User
 from app.schemas.pagination import Pagination
@@ -17,6 +18,7 @@ class UserUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     email: Optional[EmailStr] = Field(default=None)
     full_name: Optional[Text] = Field(default=None)
+    role: Optional[Role] = Field(default=None)
     disabled: Optional[bool] = Field(default=None)
 
 
@@ -69,14 +71,18 @@ async def retrieve_user(
     return user
 
 
-@router.put("/users/{user_id}")
-async def update_user(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    user_id: Text,
-    user_update: UserUpdate = Body(...),
-) -> User:
+@router.put(
+    "/users/{user_id}",
+    dependencies=[Depends(RoleChecker([Role.ADMIN]))],
+)
+async def update_user(user_id: Text, user_update: UserUpdate = Body(...)) -> User:
     """Update user profile information."""
 
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented"
+    user = update_db_user(
+        user_id=user_id, update_data=user_update.model_dump(exclude_none=True)
     )
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    return user

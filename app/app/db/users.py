@@ -1,10 +1,10 @@
 from types import MappingProxyType
-from typing import Literal, Optional, Text
+from typing import Dict, Literal, Optional, Text
 
 from app.schemas.oauth import UserInDB
 from app.schemas.pagination import Pagination
 
-fake_users_db = MappingProxyType(
+fake_users_db_init = MappingProxyType(
     {
         "admin": {
             "id": "01917074-e006-7df3-b00b-d5daa3631291",
@@ -35,6 +35,7 @@ fake_users_db = MappingProxyType(
         },
     }
 )
+fake_users_db = dict(fake_users_db_init)
 
 
 def get_user(db, username: Text):
@@ -89,3 +90,24 @@ def list_users(
             "has_more": len(users) > limit,
         }
     )
+
+
+def update_user(
+    db=fake_users_db, *, user_id: Text, update_data: Dict
+) -> Optional[UserInDB]:
+    """Update a user in the database."""
+
+    user = get_user_by_id(db=db, user_id=user_id)
+    if user is None:
+        return None
+    # Validate update data
+    update_data = {k: v for k, v in update_data.items() if v is not None}
+    update_data.pop("id", None)
+    update_data.pop("username", None)
+    update_data.pop("hashed_password", None)
+    # Update user data
+    user_data = user.model_dump()
+    user_data.update(update_data)
+    update_user = UserInDB.model_validate(user_data)
+    db[user.username] = update_user.model_dump()
+    return update_user
