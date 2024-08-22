@@ -14,7 +14,7 @@ init(autoreset=True)
 
 
 class Settings(BaseSettings):
-    app_name: Text = "fastapi-app-service"
+    app_name: Text = "fastapi-chat"
     app_version: Text = VERSION
     app_env: Literal["development", "production", "test"] | Text | None = "development"
     logging_level: Text = "DEBUG"

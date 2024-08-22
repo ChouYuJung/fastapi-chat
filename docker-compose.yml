@@ -2,18 +2,18 @@
 version: "3"
 services:
   fastapi-app-service:
-    image: fastapi-app:${FASTAPI_APP_VERSION:-latest}
-    container_name: fastapi-app-service
+    image: fastapi-chat:${FASTAPI_APP_VERSION:-latest}
+    container_name: fastapi-chat-service
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "8880:80"
     networks:
-      - fastapi-network
+      - fastapi-chat-network
     volumes:
       - ./app:/app
     tty: true
 networks:
   fastapi-network:
-    name: fastapi-network
+    name: fastapi-chat-network
