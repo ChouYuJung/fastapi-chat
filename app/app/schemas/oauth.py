@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Literal, Optional, Text
+from typing import Annotated, Literal, Optional, Required, Text, TypedDict
 
 import uuid_utils as uuid
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -23,10 +23,19 @@ class Token(BaseModel):
     access_token: Text
     token_type: Literal["bearer"] | Text
 
+    @classmethod
+    def from_bearer_token(cls, token: Text) -> "Token":
+        return cls.model_validate({"access_token": token, "token_type": "bearer"})
+
 
 class TokenData(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     username: Optional[Text] = None
+
+
+class PayloadParam(TypedDict, total=False):
+    sub: Required[Annotated[Text, "subject or username"]]
+    exp: Required[Annotated[int, "expiration time in seconds"]]
 
 
 class User(BaseModel):

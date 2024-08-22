@@ -1,9 +1,10 @@
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Dict, Optional, Text
 
 from app.config import settings
 from app.db.users import get_user
-from app.schemas.oauth import UserInDB
+from app.schemas.oauth import PayloadParam, UserInDB
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -61,3 +62,33 @@ def verify_token(token: Text) -> Optional[Dict]:
         return payload
     except JWTError:
         return None
+
+
+def verify_payload(payload: Dict) -> Optional[PayloadParam]:
+    """Verify the payload and return the payload if valid."""
+
+    subject = payload.get("sub")
+    expires = payload.get("exp")
+    if not isinstance(subject, Text):
+        return None
+    if not isinstance(expires, int):
+        return None
+    return PayloadParam(sub=subject, exp=expires)
+
+
+def is_token_expired(token_or_payload: Text | Dict | PayloadParam) -> bool:
+    """Check if the token is expired."""
+
+    payload = (
+        verify_token(token_or_payload)
+        if isinstance(token_or_payload, Text)
+        else token_or_payload
+    )
+    if payload is None:
+        return True
+    payload = verify_payload(dict(payload))
+    if payload is None:
+        return True
+    if time.time() > payload["exp"]:
+        return True
+    return False
