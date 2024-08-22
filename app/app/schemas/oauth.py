@@ -9,13 +9,13 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 class Role(str, Enum):
     ADMIN = "admin"
-    CONTRIBUTOR = "contributor"
+    EDITOR = "editor"
     VIEWER = "viewer"
 
 
 ROLE_PERMISSIONS = {
     Role.ADMIN: ("read", "write", "delete"),
-    Role.CONTRIBUTOR: ("read", "write"),
+    Role.EDITOR: ("read", "write"),
     Role.VIEWER: ("read",),
 }
 

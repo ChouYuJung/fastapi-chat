@@ -20,7 +20,7 @@ fake_users_db_init = MappingProxyType(
             "username": "team",
             "full_name": "Team User",
             "email": "team@example.com",
-            "role": "contributor",
+            "role": "editor",
             "hashed_password": "$2b$12$vju9EMyn.CE80h88pErZNuSC.0EZOH/rqw2RpCLdCeEVLRPfhDlYS",  # 'pass1234', noqa: E501
             "disabled": False,
         },

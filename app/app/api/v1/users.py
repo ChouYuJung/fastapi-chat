@@ -17,7 +17,7 @@ router = APIRouter()
 
 @router.get(
     "/users/me",
-    dependencies=[Depends(RoleChecker([Role.ADMIN, Role.CONTRIBUTOR, Role.VIEWER]))],
+    dependencies=[Depends(RoleChecker([Role.ADMIN, Role.EDITOR, Role.VIEWER]))],
 )
 async def read_users_me(
     current_user: Annotated[User, Depends(get_current_active_user)]
@@ -29,7 +29,7 @@ async def read_users_me(
 
 @router.get(
     "/users",
-    dependencies=[Depends(RoleChecker([Role.ADMIN, Role.CONTRIBUTOR]))],
+    dependencies=[Depends(RoleChecker([Role.ADMIN, Role.EDITOR]))],
 )
 async def list_users(
     disabled: Optional[bool] = Query(False),
@@ -83,7 +83,7 @@ async def create_user(
 
 @router.get(
     "/users/{user_id}",
-    dependencies=[Depends(RoleChecker([Role.ADMIN, Role.CONTRIBUTOR]))],
+    dependencies=[Depends(RoleChecker([Role.ADMIN, Role.EDITOR]))],
 )
 async def retrieve_user(
     user_id: Text = QueryPath(..., min_length=4, max_length=64),
