@@ -15,5 +15,5 @@ services:
       - ./app:/app
     tty: true
 networks:
-  fastapi-network:
+  fastapi-chat-network:
     name: fastapi-chat-network
