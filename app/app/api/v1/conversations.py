@@ -1,6 +1,11 @@
 from typing import Annotated, List, Literal, Optional, Text
 
-from app.db.conversations import create_conversation
+from app.db.conversations import (
+    create_conversation,
+    fake_conversations_db,
+    fake_user_conversations_db,
+    list_conversations,
+)
 from app.db.users import create_user as create_db_user
 from app.db.users import get_user_by_id
 from app.db.users import list_users as list_db_users
@@ -27,19 +32,35 @@ router = APIRouter()
     response_model=Conversation,
 )
 async def api_create_conversation(conversation_create: ConversationCreate):
+    """Create a new conversation."""
+
     conversation = conversation_create.to_conversation()
-    return await crud.create_conversation(db, conversation, current_user)
+    create_conversation(fake_conversations_db, conversation=conversation)
+    return conversation
 
 
-@router.get("/conversations", response_model=List[Conversation])
+@router.get(
+    "/conversations",
+    dependencies=[Depends(RoleChecker([Role.ADMIN, Role.EDITOR]))],
+    response_model=List[Conversation],
+)
 async def api_list_conversations(
-    skip: int = 0,
-    limit: int = 100,
-    current_user: User = Depends(get_current_user),
-    db=Depends(get_db),
-):
-    return await crud.get_user_conversations(
-        db, current_user.id, skip=skip, limit=limit
+    disabled: Optional[bool] = Query(default=None),
+    sort: Literal["asc", "desc", 1, -1] = Query(default="asc"),
+    start: Optional[Text] = Query(default=None),
+    before: Optional[Text] = Query(default=None),
+    limit: Optional[int] = Query(default=20),
+) -> Pagination[Conversation]:
+    """List conversations from the database."""
+
+    return Pagination[Conversation].model_validate(
+        list_conversations(
+            disabled=disabled,
+            sort=sort,
+            start=start,
+            before=before,
+            limit=limit,
+        ).model_dump()
     )
 
 
