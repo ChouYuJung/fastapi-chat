@@ -1,50 +1,93 @@
 import time
-from typing import Annotated, List, Text
+from typing import Annotated, List, Text, Tuple
 
-from app.config import settings
+from app.config import logger
 from app.db.tokens import fake_token_blacklist, is_token_invalid
 from app.db.users import fake_users_db, get_user
-from app.schemas.oauth import Role, TokenData, User
-from app.utils.oauth import oauth2_scheme, verify_token
+from app.schemas.oauth import PayloadParam, Role, TokenData, User, UserInDB
+from app.utils.oauth import oauth2_scheme, verify_payload, verify_token
 from fastapi import Depends, HTTPException, status
-from jose import JWTError, jwt
 
 
-async def get_current_user(token: Annotated[Text, Depends(oauth2_scheme)]):
+async def get_token_payload(
+    token: Text = Depends(oauth2_scheme),
+) -> Tuple[Text, PayloadParam]:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    token_expired_exception = HTTPException(
+
+    # Verify the token and check the payload.
+    payload = verify_token(token)
+    if payload is None:
+        logger.debug(f"Token '{token}' is invalid")
+        raise credentials_exception
+    payload = verify_payload(payload)
+    if payload is None:
+        logger.debug(f"Token '{token}' has an invalid payload")
+        raise credentials_exception
+
+    return (token, payload)
+
+
+async def get_current_token_payload(
+    token_payload: Annotated[Tuple[Text, PayloadParam], Depends(get_token_payload)]
+) -> Tuple[Text, PayloadParam]:
+    payload = token_payload[1]
+    if time.time() > payload["exp"]:
+        logger.debug(f"Token '{token_payload[0]}' has expired at {payload['exp']}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return token_payload
+
+
+async def get_current_active_token_payload(
+    token_payload: Annotated[
+        Tuple[Text, PayloadParam], Depends(get_current_token_payload)
+    ]
+) -> Tuple[Text, PayloadParam]:
+
+    token = token_payload[0]
+    if is_token_invalid(fake_token_blacklist, token=token):
+        logger.debug(f"Token '{token}' has been invalidated")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return token_payload
+
+
+async def get_current_user(
+    token_payload: Annotated[
+        Tuple[Text, PayloadParam], Depends(get_current_active_token_payload)
+    ]
+) -> UserInDB:
+    credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Token expired",
+        detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # Check if token is inactivated
-    if token in fake_token_blacklist:
-        credentials_exception.detail = "Token has been invalidated"
+    # Parse token data
+    payload = token_payload[1]
+    username = payload.get("sub")
+    token_data = TokenData(username=username)
+    if token_data.username is None:
+        logger.debug(f"Token '{token_payload[0]}' has an invalid username")
         raise credentials_exception
 
-    try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
-        username: Text = payload.get("sub")  # type: ignore
-        expires: int = payload.get("exp")  # type: ignore
-        if username is None:
-            raise credentials_exception
-        if time.time() > expires:
-            raise token_expired_exception
-        token_data = TokenData(username=username)
-    except JWTError:
-        raise credentials_exception
-    if token_data.username is None:
-        raise credentials_exception
+    # Get user from the database
     user = get_user(fake_users_db, username=token_data.username)
     if user is None:
+        logger.debug(f"User '{token_data.username}' not found")
         raise credentials_exception
+
+    # Return the user
     return user
 
 
@@ -52,6 +95,7 @@ async def get_current_active_user(
     current_user: Annotated[User, Depends(get_current_user)]
 ):
     if current_user.disabled:
+        logger.debug(f"User '{current_user.username}' is inactive")
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 

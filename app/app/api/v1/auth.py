@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import Annotated, Text
+from typing import Annotated, Text, Tuple
 
 from app.config import logger, settings
 from app.db.tokens import (
@@ -8,20 +8,16 @@ from app.db.tokens import (
     fake_token_db,
     get_token,
     invalidate_token,
-    is_token_invalid,
     logout_user,
 )
 from app.db.users import create_user, fake_users_db
-from app.deps.oauth import get_current_active_user
-from app.schemas.oauth import Token, User, UserGuestRegister
+from app.deps.oauth import get_current_active_token_payload, get_current_active_user
+from app.schemas.oauth import PayloadParam, Token, User, UserGuestRegister
 from app.utils.oauth import (
     authenticate_user,
     create_access_token,
     get_password_hash,
     is_token_expired,
-    oauth2_scheme,
-    verify_payload,
-    verify_token,
 )
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
@@ -65,10 +61,9 @@ async def api_register(
         )
 
     # Create an access token for the new user.
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": created_user.username, "role": created_user.role},
-        expires_delta=access_token_expires,
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
     # Save the token to the database.
@@ -92,20 +87,17 @@ async def api_login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Check if token exists in the database
-    access_token: Text
-    token_exists = get_token(fake_token_db, username=user.username)
-    if token_exists is not None:
-        access_token = token_exists
+    # Return if token active
+    access_token = get_token(fake_token_db, username=user.username)
+    if access_token is not None and is_token_expired(access_token) is False:
         logger.debug(f"User '{form_data.username}' already has a token")
         return Token.from_bearer_token(access_token)
+
     # Create an access token for the authenticated user.
-    else:
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user.username, "role": user.role},
-            expires_delta=access_token_expires,
-        )
+    access_token = create_access_token(
+        data={"sub": user.username, "role": user.role},
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
 
     # Save the token to the database.
     create_token(fake_token_db, username=user.username, token=access_token)
@@ -115,7 +107,12 @@ async def api_login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
 
 
 @router.post("/logout")
-async def api_logout(token: Annotated[Text, Depends(oauth2_scheme)]):
+async def api_logout(
+    token_payload: Annotated[
+        Tuple[Text, PayloadParam], Depends(get_current_active_token_payload)
+    ]
+    # token: Annotated[Text, Depends(oauth2_scheme)]
+):
     """Invalidate the token for the given user."""
 
     credentials_exception = HTTPException(
@@ -124,29 +121,13 @@ async def api_logout(token: Annotated[Text, Depends(oauth2_scheme)]):
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # Verify the token and invalidate it.
-    payload = verify_token(token)
-    if payload is None:
-        raise credentials_exception
-    payload = verify_payload(payload)
-    if payload is None:
-        raise credentials_exception
-    if is_token_expired(payload):
-        credentials_exception.detail = "Token expired"
-        raise credentials_exception
-
-    # Check if token is inactivated
-    if is_token_invalid(fake_token_blacklist, token=token):
-        credentials_exception.detail = "Token has been invalidated"
-        raise credentials_exception
-
-    # Logout user by setting the token disable
+    token = token_payload[0]
+    payload = token_payload[1]
     username = payload.get("sub")
     if not isinstance(username, Text):
         raise credentials_exception
-    existing_token = get_token(fake_token_db, username=username)
-    if existing_token is None:
-        raise credentials_exception
+
+    # Logout user by setting the token disable
     logout_user(fake_token_db, username=username)
 
     # Invalidate the token.
