@@ -112,7 +112,7 @@ def is_token_expired(token_or_payload: Text | Dict | PayloadParam) -> bool:
     return False
 
 
-def validate_client(client_id: Text, client_secret: Text) -> bool:
+def validate_client(client_id: Optional[Text], client_secret: Optional[Text]) -> bool:
     # Replace this with your actual client validation logic
     # For example, check against a database of registered clients
     return True

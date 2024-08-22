@@ -40,7 +40,11 @@ def is_token_invalid(db=fake_token_blacklist, *, token: Text) -> bool:
     return token in db
 
 
-def logout_user(db=fake_token_db, *, username: Text) -> Optional["Token"]:
+def logout_user(
+    db=fake_token_db, *, username: Text, with_invalidate_token: bool = True
+) -> Optional["Token"]:
     """Logout the user by deleting the token."""
 
-    return db.pop(username, None)
+    should_invalid_token = db.pop(username, None)
+    if with_invalidate_token is True:
+        invalidate_token(token=should_invalid_token)

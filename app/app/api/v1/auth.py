@@ -2,16 +2,15 @@ from datetime import timedelta
 from typing import Annotated, Text, Tuple
 
 from app.config import logger, settings
-from app.db.tokens import (
-    fake_token_blacklist,
-    fake_token_db,
-    get_token,
-    invalidate_token,
-    logout_user,
-    save_token,
-)
+from app.db.tokens import fake_token_db, get_token, logout_user, save_token
 from app.db.users import create_user, fake_users_db
-from app.deps.oauth import get_current_active_token_payload
+from app.deps.oauth import (
+    get_current_active_token_payload,
+    get_current_active_user,
+    get_current_token_payload,
+    get_current_user,
+    get_token_payload,
+)
 from app.schemas.oauth import (
     PayloadParam,
     RefreshTokenRequest,
@@ -23,6 +22,7 @@ from app.utils.oauth import (
     create_access_and_refresh_tokens,
     get_password_hash,
     is_token_expired,
+    validate_client,
 )
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
@@ -144,8 +144,7 @@ async def api_logout(
         raise credentials_exception
 
     # Logout user and invalidate the token.
-    _inactive_token = logout_user(fake_token_db, username=username)
-    invalidate_token(fake_token_blacklist, token=_inactive_token)
+    logout_user(fake_token_db, username=username, with_invalidate_token=True)
 
     # Return a response.
     return JSONResponse(
@@ -159,40 +158,49 @@ async def api_logout(
 
 
 @router.post("/refresh-token", response_model=Token)
-async def api_refresh_token(refresh_token_request: RefreshTokenRequest = Body(...)):
-    """Refresh the access token for the current user.
-    TODO: Implement refresh token to invalidate the old token and return a new token.
-    """
-    pass
-    # # Validate grant_type
-    # if grant_type != "refresh_token":
-    #     raise HTTPException(status_code=400, detail="Invalid grant_type")
+async def api_refresh_token(form_data: RefreshTokenRequest = Body(...)):
+    """Refresh the access token for the current user."""
 
-    # # Validate client credentials (replace with your actual client validation logic)
-    # if not validate_client(client_id, client_secret):
-    #     raise HTTPException(status_code=401, detail="Invalid client credentials")
+    # Validate grant_type
+    if form_data.grant_type != "refresh_token":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid grant_type",
+            headers={"WWW-Authenticate": "Bearer error=invalid_request"},
+        )
 
-    # try:
-    #     payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
-    #     username: str = payload.get("sub")
-    #     if username is None:
-    #         raise HTTPException(status_code=400, detail="Invalid refresh token")
-    #     user = get_user(fake_users_db, username)
-    #     if user is None:
-    #         raise HTTPException(status_code=400, detail="User not found")
+    # Validate client credentials (replace with your actual client validation logic)
+    if not validate_client(form_data.client_id, form_data.client_secret):
+        raise HTTPException(status_code=401, detail="Invalid client credentials")
 
-    #     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    #     access_token = save_token(
-    #         data={"sub": user.username}, expires_delta=access_token_expires
-    #     )
-    #     refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    #     new_refresh_token = save_token(
-    #         data={"sub": user.username}, expires_delta=refresh_token_expires
-    #     )
-    #     return {
-    #         "access_token": access_token,
-    #         "refresh_token": new_refresh_token,
-    #         "token_type": "bearer",
-    #     }
-    # except JWTError:
-    #     raise HTTPException(status_code=400, detail="Invalid refresh token")
+    # Validate the user from refresh token and payload
+    user = await get_current_active_user(
+        await get_current_user(
+            await get_current_active_token_payload(
+                await get_current_token_payload(
+                    await get_token_payload(form_data.refresh_token)
+                )
+            )
+        )
+    )
+
+    # Create a new access token for the user
+    access_token, refresh_token = create_access_and_refresh_tokens(
+        data={"sub": user.username, "role": user.role},
+        access_token_expires_delta=timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        ),
+        refresh_token_expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    )
+    token = Token.from_bearer_token(
+        access_token=access_token, refresh_token=refresh_token
+    )
+
+    # Invalidate the old token
+    logout_user(fake_token_db, username=user.username, with_invalidate_token=True)
+
+    # Save the new token to the database
+    save_token(fake_token_db, username=user.username, token=token)
+
+    # Return the new access token
+    return token
