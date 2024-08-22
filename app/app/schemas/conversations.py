@@ -24,6 +24,7 @@ class Conversation(BaseModel):
         None, description="Name of the conversation (for group chats)"
     )
     participants: List[ConversationParticipant]
+    disabled: bool = Field(default=False)
     created_at: int = Field(default_factory=lambda: int(time.time()))
     updated_at: int = Field(default_factory=lambda: int(time.time()))
     last_message_at: Optional[int] = Field(default=None)
@@ -73,8 +74,11 @@ class Conversation(BaseModel):
 
 class ConversationCreate(BaseModel):
     type: ConversationType
-    name: Optional[str] = None
+    name: Optional[Text] = Field(
+        None, description="Name of the conversation (for group chats)"
+    )
     participant_ids: List[Text]
+    disabled: Optional[bool] = Field(default=None)
 
     def to_conversation(self, conversation_id: Optional[Text] = None) -> Conversation:
         conversation = Conversation.model_validate(
@@ -92,8 +96,9 @@ class ConversationCreate(BaseModel):
 
 
 class ConversationUpdate(BaseModel):
-    name: Optional[Text] = None
-    participant_ids: Optional[List[Text]] = None
+    name: Optional[Text] = Field(default=None)
+    participant_ids: Optional[List[Text]] = Field(default=None)
+    disabled: Optional[bool] = Field(default=None)
 
     def to_conversation(self, conversation: Conversation) -> Conversation:
         conversation_date = conversation.model_dump()
