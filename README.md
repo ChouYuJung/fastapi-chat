@@ -28,18 +28,20 @@ This API is designed to be scalable, secure, and efficient, catering to the need
 
 ## User Management APIs
 
-### 1. Authentication API (TODO)
+### 1. Authentication API
 
 - POST /auth/register: Create a new user account
 - POST /auth/login: Authenticate a user and generate access token
 - POST /auth/logout: Log out a user and invalidate their token
 - POST /auth/refresh-token: Refresh an expired access token
 
-### 2. User Profile API (TODO)
+### 2. User Profile API
 
 - GET /users/me: Retrieve the current user's profile information
-- GET /users/{userId}: Retrieve user profile information
-- PUT /users/{userId}: Update user profile information
+- GET /users: List users with optional filtering and pagination
+- POST /users: Create a new user
+- GET /users/{user_id}: Retrieve user profile information
+- PUT /users/{user_id}: Update user profile information
 
 ## Messaging APIs
 
