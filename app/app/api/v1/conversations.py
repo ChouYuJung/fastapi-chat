@@ -2,26 +2,23 @@ from typing import Annotated, List, Literal, Optional, Text
 
 from app.db.conversations import (
     create_conversation,
+    delete_conversation,
     fake_conversations_db,
-    fake_user_conversations_db,
     list_conversations,
+    retrieve_conversation,
+    update_conversation,
 )
-from app.db.users import create_user as create_db_user
-from app.db.users import get_user_by_id
-from app.db.users import list_users as list_db_users
-from app.db.users import update_user as update_db_user
-from app.deps.oauth import RoleChecker, get_current_active_user, get_current_user
+from app.deps.oauth import RoleChecker
 from app.schemas.conversations import (
     Conversation,
     ConversationCreate,
     ConversationUpdate,
 )
-from app.schemas.oauth import Role, User, UserCreate, UserUpdate
+from app.schemas.oauth import Role
 from app.schemas.pagination import Pagination
-from app.utils.oauth import get_password_hash
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi import Path as QueryPath
-from fastapi import Query, status
+from fastapi import Query, Response, status
 
 router = APIRouter()
 
@@ -55,6 +52,7 @@ async def api_list_conversations(
 
     return Pagination[Conversation].model_validate(
         list_conversations(
+            fake_conversations_db,
             disabled=disabled,
             sort=sort,
             start=start,
@@ -64,50 +62,57 @@ async def api_list_conversations(
     )
 
 
-@router.get("/conversations/{conversation_id}", response_model=Conversation)
+@router.get(
+    "/conversations/{conversation_id}",
+    dependencies=[Depends(RoleChecker([Role.ADMIN, Role.EDITOR]))],
+    response_model=Conversation,
+)
 async def api_get_conversation(
-    conversation_id: str,
-    current_user: User = Depends(get_current_user),
-    db=Depends(get_db),
+    conversation_id: Annotated[Text, QueryPath(...)],
 ):
-    conversation = await crud.get_conversation(db, conversation_id)
+    """Retrieve a conversation by ID."""
+
+    conversation = retrieve_conversation(
+        fake_conversations_db, conversation_id=conversation_id
+    )
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    if current_user.id not in [p.user_id for p in conversation.participants]:
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this conversation"
-        )
+
     return conversation
 
 
-@router.put("/conversations/{conversation_id}", response_model=Conversation)
+@router.put(
+    "/conversations/{conversation_id}",
+    dependencies=[Depends(RoleChecker([Role.ADMIN, Role.EDITOR]))],
+    response_model=Conversation,
+)
 async def api_update_conversation(
-    conversation_id: str,
+    conversation_id: Annotated[Text, QueryPath(...)],
     conversation_update: ConversationUpdate,
-    current_user: User = Depends(get_current_user),
-    db=Depends(get_db),
 ):
-    conversation = await crud.get_conversation(db, conversation_id)
+    """Update an existing conversation."""
+
+    conversation = update_conversation(
+        fake_conversations_db,
+        conversation_id=conversation_id,
+        conversation_update=conversation_update,
+    )
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    if current_user.id not in [p.user_id for p in conversation.participants]:
-        raise HTTPException(
-            status_code=403, detail="Not authorized to update this conversation"
-        )
-    return await crud.update_conversation(db, conversation_id, conversation_update)
+    return conversation
 
 
-@router.delete("/conversations/{conversation_id}", status_code=204)
+@router.delete(
+    "/conversations/{conversation_id}",
+    dependencies=[Depends(RoleChecker([Role.ADMIN]))],
+)
 async def api_delete_conversation(
-    conversation_id: str,
-    current_user: User = Depends(get_current_user),
-    db=Depends(get_db),
+    conversation_id: Annotated[Text, QueryPath(...)],
+    soft_delete: Annotated[bool, Query(default=True)],
 ):
-    conversation = await crud.get_conversation(db, conversation_id)
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    if current_user.id not in [p.user_id for p in conversation.participants]:
-        raise HTTPException(
-            status_code=403, detail="Not authorized to delete this conversation"
-        )
-    await crud.delete_conversation(db, conversation_id)
+    """Delete a conversation"""
+
+    delete_conversation(
+        fake_conversations_db, conversation_id=conversation_id, soft_delete=soft_delete
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

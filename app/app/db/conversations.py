@@ -1,12 +1,10 @@
-from types import MappingProxyType
-from typing import Annotated, Dict, List, Literal, Optional, Set, Text, TypedDict
+from typing import Annotated, Dict, List, Literal, Optional, Set, Text
 
-from app.schemas.conversations import Conversation, ConversationInDB
-from app.schemas.oauth import User, UserInDB
+from app.schemas.conversations import Conversation, ConversationInDB, ConversationUpdate
 from app.schemas.pagination import Pagination
 
 fake_conversations_db: Annotated[
-    Dict[Text, "Conversation"], "conversation_id: conversation"
+    Dict[Text, "ConversationInDB"], "conversation_id: conversation"
 ] = {}
 fake_user_conversations_db: Annotated[
     Dict[Text, Set[Text]], "user_id: [conversation_id]"
@@ -19,8 +17,10 @@ def create_conversation(
     *,
     conversation: "Conversation",
     user_id: Optional[Text] = None,
-) -> "Conversation":
+) -> "ConversationInDB":
     """Create a new conversation in the database."""
+
+    conversation = ConversationInDB.model_validate(conversation)
 
     # Validate conversation data
     if conversation.id in db:
@@ -91,6 +91,50 @@ def list_conversations(
             "has_more": len(conversations) > limit,
         }
     )
+
+
+def retrieve_conversation(
+    db=fake_conversations_db,
+    *,
+    conversation_id: Text,
+) -> Optional["ConversationInDB"]:
+    """Retrieve a conversation from the database."""
+
+    return db.get(conversation_id)
+
+
+def update_conversation(
+    db=fake_conversations_db,
+    *,
+    conversation_id: Text,
+    conversation_update: "ConversationUpdate",
+) -> Optional["ConversationInDB"]:
+    """Update a conversation in the database."""
+
+    conversation = retrieve_conversation(db, conversation_id=conversation_id)
+    if conversation is None:
+        return None
+    conversation = conversation_update.to_conversation(conversation)
+    conversation = ConversationInDB.model_validate(conversation.model_dump())
+    db[conversation_id] = conversation
+    return conversation
+
+
+def delete_conversation(
+    db=fake_conversations_db,
+    *,
+    conversation_id: Text,
+    soft_delete: bool = True,
+) -> None:
+    """Delete a conversation from the database."""
+
+    if soft_delete:
+        conversation = retrieve_conversation(db, conversation_id=conversation_id)
+        if conversation is not None:
+            conversation.disabled = True
+            db[conversation_id] = conversation
+    else:
+        db.pop(conversation_id, None)
 
 
 def list_user_conversations(
