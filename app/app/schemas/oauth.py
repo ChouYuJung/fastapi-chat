@@ -1,3 +1,5 @@
+import hashlib
+import json
 from enum import Enum
 from typing import Annotated, Literal, Optional, Required, Text, TypedDict
 
@@ -21,11 +23,35 @@ ROLE_PERMISSIONS = {
 class Token(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     access_token: Text
+    refresh_token: Text
     token_type: Literal["bearer"] | Text
 
     @classmethod
-    def from_bearer_token(cls, token: Text) -> "Token":
-        return cls.model_validate({"access_token": token, "token_type": "bearer"})
+    def from_bearer_token(cls, access_token: Text, refresh_token: Text) -> "Token":
+        return cls.model_validate(
+            {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_type": "bearer",
+            }
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Token):
+            return False
+        return self.md5() == other.md5()
+
+    def md5(self) -> Text:
+        return hashlib.md5(
+            json.dumps(self.model_dump(), sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+
+
+class RefreshTokenRequest(BaseModel):
+    grant_type: Literal["refresh_token"] = Field(...)
+    refresh_token: Text = Field(...)
+    client_id: Optional[Text] = Field(default=None)
+    client_secret: Optional[Text] = Field(default=None)
 
 
 class TokenData(BaseModel):

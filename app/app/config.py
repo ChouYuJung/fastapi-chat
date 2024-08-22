@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     )
     ALGORITHM: Text = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     def validate_values(self):
         if self.app_env not in ("development", "production", "test"):

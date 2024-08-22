@@ -3,19 +3,24 @@ from typing import Annotated, Text, Tuple
 
 from app.config import logger, settings
 from app.db.tokens import (
-    create_token,
     fake_token_blacklist,
     fake_token_db,
     get_token,
     invalidate_token,
     logout_user,
+    save_token,
 )
 from app.db.users import create_user, fake_users_db
-from app.deps.oauth import get_current_active_token_payload, get_current_active_user
-from app.schemas.oauth import PayloadParam, Token, User, UserGuestRegister
+from app.deps.oauth import get_current_active_token_payload
+from app.schemas.oauth import (
+    PayloadParam,
+    RefreshTokenRequest,
+    Token,
+    UserGuestRegister,
+)
 from app.utils.oauth import (
     authenticate_user,
-    create_access_token,
+    create_access_and_refresh_tokens,
     get_password_hash,
     is_token_expired,
 )
@@ -61,16 +66,22 @@ async def api_register(
         )
 
     # Create an access token for the new user.
-    access_token = create_access_token(
+    access_token, refresh_token = create_access_and_refresh_tokens(
         data={"sub": created_user.username, "role": created_user.role},
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        access_token_expires_delta=timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        ),
+        refresh_token_expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    )
+    token = Token.from_bearer_token(
+        access_token=access_token, refresh_token=refresh_token
     )
 
     # Save the token to the database.
-    create_token(fake_token_db, username=created_user.username, token=access_token)
+    save_token(fake_token_db, username=created_user.username, token=token)
 
     # Return the access token.
-    return Token.from_bearer_token(access_token)
+    return token
 
 
 @router.post("/login", response_model=Token)
@@ -88,22 +99,28 @@ async def api_login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
         )
 
     # Return if token active
-    access_token = get_token(fake_token_db, username=user.username)
-    if access_token is not None and is_token_expired(access_token) is False:
+    token = get_token(fake_token_db, username=user.username)
+    if token is not None and is_token_expired(token.access_token) is False:
         logger.debug(f"User '{form_data.username}' already has a token")
-        return Token.from_bearer_token(access_token)
+        return token
 
     # Create an access token for the authenticated user.
-    access_token = create_access_token(
+    access_token, refresh_token = create_access_and_refresh_tokens(
         data={"sub": user.username, "role": user.role},
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        access_token_expires_delta=timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        ),
+        refresh_token_expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    )
+    token = Token.from_bearer_token(
+        access_token=access_token, refresh_token=refresh_token
     )
 
     # Save the token to the database.
-    create_token(fake_token_db, username=user.username, token=access_token)
+    save_token(fake_token_db, username=user.username, token=token)
 
     # Return the access token.
-    return Token.from_bearer_token(access_token)
+    return token
 
 
 @router.post("/logout")
@@ -121,17 +138,14 @@ async def api_logout(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    token = token_payload[0]
     payload = token_payload[1]
     username = payload.get("sub")
     if not isinstance(username, Text):
         raise credentials_exception
 
-    # Logout user by setting the token disable
-    logout_user(fake_token_db, username=username)
-
-    # Invalidate the token.
-    invalidate_token(fake_token_blacklist, token=token)
+    # Logout user and invalidate the token.
+    _inactive_token = logout_user(fake_token_db, username=username)
+    invalidate_token(fake_token_blacklist, token=_inactive_token)
 
     # Return a response.
     return JSONResponse(
@@ -145,15 +159,40 @@ async def api_logout(
 
 
 @router.post("/refresh-token", response_model=Token)
-async def api_refresh_token(
-    current_user: Annotated[User, Depends(get_current_active_user)]
-) -> Token:
+async def api_refresh_token(refresh_token_request: RefreshTokenRequest = Body(...)):
     """Refresh the access token for the current user.
     TODO: Implement refresh token to invalidate the old token and return a new token.
     """
+    pass
+    # # Validate grant_type
+    # if grant_type != "refresh_token":
+    #     raise HTTPException(status_code=400, detail="Invalid grant_type")
 
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    new_access_token = create_access_token(
-        data={"sub": current_user.username}, expires_delta=access_token_expires
-    )
-    return Token.from_bearer_token(new_access_token)
+    # # Validate client credentials (replace with your actual client validation logic)
+    # if not validate_client(client_id, client_secret):
+    #     raise HTTPException(status_code=401, detail="Invalid client credentials")
+
+    # try:
+    #     payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+    #     username: str = payload.get("sub")
+    #     if username is None:
+    #         raise HTTPException(status_code=400, detail="Invalid refresh token")
+    #     user = get_user(fake_users_db, username)
+    #     if user is None:
+    #         raise HTTPException(status_code=400, detail="User not found")
+
+    #     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    #     access_token = save_token(
+    #         data={"sub": user.username}, expires_delta=access_token_expires
+    #     )
+    #     refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    #     new_refresh_token = save_token(
+    #         data={"sub": user.username}, expires_delta=refresh_token_expires
+    #     )
+    #     return {
+    #         "access_token": access_token,
+    #         "refresh_token": new_refresh_token,
+    #         "token_type": "bearer",
+    #     }
+    # except JWTError:
+    #     raise HTTPException(status_code=400, detail="Invalid refresh token")

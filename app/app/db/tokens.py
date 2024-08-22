@@ -1,11 +1,16 @@
-from typing import Annotated, Dict, Optional, Set, Text
+from typing import TYPE_CHECKING, Annotated, Dict, Optional, Set, Text
 
-fake_token_db: Annotated[Dict[Text, Text], "username: token"] = {}
+if TYPE_CHECKING:
+    from app.schemas.oauth import Token
+
+fake_token_db: Annotated[Dict[Text, "Token"], "username: token"] = {}
 
 fake_token_blacklist: Set[Text] = set()
 
 
-def create_token(db=fake_token_db, *, username: Text, token: Text) -> Optional[Text]:
+def save_token(
+    db=fake_token_db, *, username: Text, token: "Token"
+) -> Optional["Token"]:
     """Create a new token for the given user."""
 
     if get_token(db, username=username) == token:
@@ -14,15 +19,19 @@ def create_token(db=fake_token_db, *, username: Text, token: Text) -> Optional[T
     return token
 
 
-def get_token(db=fake_token_db, *, username: Text) -> Optional[Text]:
+def get_token(db=fake_token_db, *, username: Text) -> Optional["Token"]:
     """Get the token for the given user."""
 
     return db.get(username)
 
 
-def invalidate_token(db=fake_token_blacklist, *, token: Text):
+def invalidate_token(db=fake_token_blacklist, *, token: Optional["Token"]):
     """Invalidate the token for the given user."""
-    db.add(token)
+
+    if token is None:
+        return
+    db.add(token.access_token)
+    db.add(token.refresh_token)
 
 
 def is_token_invalid(db=fake_token_blacklist, *, token: Text) -> bool:
@@ -31,7 +40,7 @@ def is_token_invalid(db=fake_token_blacklist, *, token: Text) -> bool:
     return token in db
 
 
-def logout_user(db=fake_token_db, *, username: Text):
+def logout_user(db=fake_token_db, *, username: Text) -> Optional["Token"]:
     """Logout the user by deleting the token."""
 
-    db.pop(username, None)
+    return db.pop(username, None)

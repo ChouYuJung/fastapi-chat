@@ -1,6 +1,6 @@
 import time
 from datetime import UTC, datetime, timedelta
-from typing import Dict, Optional, Text
+from typing import Dict, Optional, Text, Tuple
 
 from app.config import settings
 from app.db.users import get_user
@@ -35,7 +35,7 @@ def authenticate_user(fake_db, username: Text, password: Text) -> Optional["User
     return user
 
 
-def create_access_token(
+def create_token(
     data: Dict,
     expires_delta: Optional[timedelta] = None,
     key: Text = settings.SECRET_KEY,
@@ -50,6 +50,24 @@ def create_access_token(
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, key, algorithm=algorithm)
     return encoded_jwt
+
+
+def create_access_and_refresh_tokens(
+    data: Dict,
+    access_token_expires_delta: Optional[timedelta] = None,
+    refresh_token_expires_delta: Optional[timedelta] = None,
+    key: Text = settings.SECRET_KEY,
+    algorithm: Text = settings.ALGORITHM,
+) -> Tuple[Text, Text]:
+    """Create an access token and a refresh token with the given data."""
+
+    access_token = create_token(
+        data, expires_delta=access_token_expires_delta, key=key, algorithm=algorithm
+    )
+    refresh_token = create_token(
+        data, expires_delta=refresh_token_expires_delta, key=key, algorithm=algorithm
+    )
+    return (access_token, refresh_token)
 
 
 def verify_token(token: Text) -> Optional[Dict]:
@@ -92,3 +110,9 @@ def is_token_expired(token_or_payload: Text | Dict | PayloadParam) -> bool:
     if time.time() > payload["exp"]:
         return True
     return False
+
+
+def validate_client(client_id: Text, client_secret: Text) -> bool:
+    # Replace this with your actual client validation logic
+    # For example, check against a database of registered clients
+    return True
