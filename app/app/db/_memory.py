@@ -151,11 +151,11 @@ class DatabaseMemory(DatabaseBase):
                 return token
         return None
 
-    def save_token(self, username: Text, token: Token) -> Optional["TokenInDB"]:
+    def caching_token(self, username: Text, token: Token) -> Optional["TokenInDB"]:
         token_db = self.retrieve_cached_token(username)
         if token_db:
             return None
-        token_db = token.to_db_model(username=username, expires_at=time.time() + )
+        token_db = token.to_db_model(username=username)
         self._db["cached_tokens"].append(token_db)
         return token_db
 

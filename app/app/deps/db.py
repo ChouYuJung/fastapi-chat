@@ -1,9 +1,10 @@
 from typing import TYPE_CHECKING
 
+from fastapi import Request
+
 if TYPE_CHECKING:
     from app.db._base import DatabaseBase
-    from fastapi import FastAPI
 
 
-def depend_db(app: "FastAPI") -> "DatabaseBase":
-    return app.state.db
+def depend_db(request: Request) -> "DatabaseBase":
+    return request.app.state.db

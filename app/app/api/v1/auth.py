@@ -3,7 +3,7 @@ from typing import Annotated, Text, Tuple
 
 from app.config import logger, settings
 from app.db._base import DatabaseBase
-from app.db.tokens import caching_token, get_cached_token, invalidate_token
+from app.db.tokens import caching_token, invalidate_token, retrieve_cached_token
 from app.db.users import create_user
 from app.deps.db import depend_db
 from app.deps.oauth import (
@@ -103,7 +103,7 @@ async def api_login(
         )
 
     # Return if token active
-    token = get_cached_token(db, username=user.username)
+    token = retrieve_cached_token(db, username=user.username)
     if token is not None and is_token_expired(token.access_token) is False:
         logger.debug(f"User '{form_data.username}' already has a token")
         return token
@@ -144,7 +144,7 @@ async def api_logout(
     if not isinstance(username, Text):
         raise credentials_exception
 
-    token = get_cached_token(db, username=username)
+    token = retrieve_cached_token(db, username=username)
 
     # Logout user and invalidate the token.
     if token is not None:
@@ -203,7 +203,7 @@ async def api_refresh_token(
     caching_token(db, username=user.username, token=token)
 
     # Logout user and invalidate the token.
-    token_old = get_cached_token(db, username=user.username)
+    token_old = retrieve_cached_token(db, username=user.username)
     if token_old is not None:
         invalidate_token(db, token=token_old)
 

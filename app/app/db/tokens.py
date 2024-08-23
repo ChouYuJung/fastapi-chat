@@ -1,12 +1,8 @@
-from typing import TYPE_CHECKING, Annotated, Dict, Optional, Set, Text
+from typing import TYPE_CHECKING, Optional, Text
 
 if TYPE_CHECKING:
     from app.db._base import DatabaseBase
     from app.schemas.oauth import Token, TokenInDB
-
-# fake_token_db: Annotated[Dict[Text, "Token"], "username: token"] = {}
-
-# fake_token_blacklist: Set[Text] = set()
 
 
 def caching_token(
@@ -14,10 +10,12 @@ def caching_token(
 ) -> Optional["Token"]:
     """Create a new token for the given user."""
 
-    return db.save_token(username=username, token=token)
+    return db.caching_token(username=username, token=token)
 
 
-def get_cached_token(db: "DatabaseBase", *, username: Text) -> Optional["TokenInDB"]:
+def retrieve_cached_token(
+    db: "DatabaseBase", *, username: Text
+) -> Optional["TokenInDB"]:
     """Get the token for the given user."""
 
     return db.retrieve_cached_token(username)

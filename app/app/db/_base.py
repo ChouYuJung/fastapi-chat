@@ -3,14 +3,7 @@ from typing import TYPE_CHECKING, Literal, Optional, Text
 from yarl import URL
 
 if TYPE_CHECKING:
-    from app.schemas.oauth import (
-        Token,
-        TokenBlacklisted,
-        TokenInDB,
-        UserCreate,
-        UserInDB,
-        UserUpdate,
-    )
+    from app.schemas.oauth import Token, TokenInDB, UserCreate, UserInDB, UserUpdate
     from app.schemas.pagination import Pagination
 
 
@@ -84,7 +77,7 @@ class DatabaseBase:
     def retrieve_cached_token(self, username: Text) -> Optional["TokenInDB"]:
         raise NotImplementedError
 
-    def save_token(self, username: Text, token: Token) -> Optional["TokenInDB"]:
+    def caching_token(self, username: Text, token: "Token") -> Optional["TokenInDB"]:
         raise NotImplementedError
 
     def invalidate_token(self, token: Optional["Token"]):

@@ -3,6 +3,7 @@ from typing import Annotated, List, Text, Tuple
 
 from app.config import logger
 from app.db._base import DatabaseBase
+from app.db.tokens import is_token_blocked
 from app.db.users import get_user
 from app.deps.db import depend_db
 from app.schemas.oauth import PayloadParam, Role, TokenData, User, UserInDB
@@ -54,7 +55,7 @@ async def get_current_active_token_payload(
 ) -> Tuple[Text, PayloadParam]:
 
     token = token_payload[0]
-    if is_token_invalid(db, token=token):
+    if is_token_blocked(db, token=token):
         logger.debug(f"Token '{token}' has been invalidated")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -145,7 +146,7 @@ def RoleChecker(allowed_roles: List[Role]):
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
             )
         # Check if the token is in the blacklist.
-        if is_token_invalid(db, token=token):
+        if is_token_blocked(db, token=token):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token has been invalidated",

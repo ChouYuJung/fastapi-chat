@@ -51,7 +51,7 @@ class Token(BaseModel):
             json.dumps(self.model_dump(), sort_keys=True, default=str).encode("utf-8")
         ).hexdigest()
 
-    def to_db_model(self, *, username: Text, expires_at: int) -> "TokenInDB":
+    def to_db_model(self, *, username: Text) -> "TokenInDB":
         token_data = self.model_dump()
         token_data["username"] = username
         return TokenInDB.model_validate(token_data)
