@@ -15,6 +15,7 @@ passlib = { extras = ["bcrypt"], version = "*" }
 psutil = "*"
 pydantic = { extras = ["email"], version = "*" }
 pydantic-settings = "*"
+pymongo = { version = "^4", extras = ["srv"] }
 python = "^3.12"
 python-jose = { extras = ["cryptography"], version = "*" }
 pytz = "*"
