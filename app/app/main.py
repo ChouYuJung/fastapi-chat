@@ -1,4 +1,5 @@
 import json
+from typing import Any, Text
 
 from app.config import settings
 from app.deps.oauth import RoleChecker
@@ -38,7 +39,19 @@ def create_app():
 
     app.include_router(api_router, prefix="/api")
 
+    # Set app state
+    from app.db.base import DatabaseBase
+
+    _db = DatabaseBase.from_url(settings.DB_URL)
+    _db.touch()
+    set_app_state(app, key="db", value=_db)
+
     return app
+
+
+def set_app_state(app: FastAPI, *, key: Text, value: Any):
+    setattr(app.state, key, value)
+    app.extra[key] = value
 
 
 app = create_app()
