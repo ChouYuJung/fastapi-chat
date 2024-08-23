@@ -1,6 +1,10 @@
-from typing import Text
+from typing import TYPE_CHECKING, Literal, Optional, Text
 
 from yarl import URL
+
+if TYPE_CHECKING:
+    from app.schemas.oauth import UserCreate, UserInDB, UserUpdate
+    from app.schemas.pagination import Pagination
 
 
 class DatabaseBase:
@@ -42,6 +46,33 @@ class DatabaseBase:
 
     def touch(self):
         pass
+
+    def retrieve_user(self, user_id: Text) -> Optional["UserInDB"]:
+        raise NotImplementedError
+
+    def retrieve_user_by_username(self, username: Text) -> Optional["UserInDB"]:
+        raise NotImplementedError
+
+    def list_users(
+        self,
+        *,
+        disabled: Optional[bool] = None,
+        sort: Literal["asc", "desc", 1, -1] = "asc",
+        start: Optional[Text] = None,
+        before: Optional[Text] = None,
+        limit: Optional[int] = 20,
+    ) -> Pagination[UserInDB]:
+        raise NotImplementedError
+
+    def update_user(
+        self, *, user_id: Text, user_update: "UserUpdate"
+    ) -> Optional["UserInDB"]:
+        raise NotImplementedError
+
+    def create_user(
+        self, *, user_create: "UserCreate", hashed_password: Text
+    ) -> Optional["UserInDB"]:
+        raise NotImplementedError
 
     def __str__(self) -> Text:
         _attr = ""

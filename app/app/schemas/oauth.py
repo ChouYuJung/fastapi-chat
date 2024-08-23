@@ -73,6 +73,11 @@ class User(BaseModel):
     role: Role
     disabled: bool = Field(default=False)
 
+    def to_db_model(self, *, hashed_password: Text) -> "UserInDB":
+        data = self.model_dump()
+        data["hashed_password"] = hashed_password
+        return UserInDB.model_validate(data)
+
 
 class UserInDB(User):
     hashed_password: Text
@@ -84,6 +89,15 @@ class UserUpdate(BaseModel):
     full_name: Optional[Text] = Field(default=None)
     role: Optional[Role] = Field(default=None)
     disabled: Optional[bool] = Field(default=None)
+
+    def apply_user(self, user: User) -> User:
+        user_data = user.model_dump()
+        user_data.update(
+            self.model_dump(
+                exclude_none=True, exclude={"id", "username", "hashed_password"}
+            )
+        )
+        return User.model_validate(user_data)
 
 
 class UserCreate(BaseModel):
