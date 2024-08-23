@@ -34,7 +34,7 @@ def create_app():
             "cookies": request.cookies,
         }
 
-    from .api.router import router as api_router
+    from .api._router import router as api_router
 
     app.include_router(api_router, prefix="/api")
 
