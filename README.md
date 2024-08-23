@@ -45,13 +45,41 @@ This API is designed to be scalable, secure, and efficient, catering to the need
 
 ## Messaging APIs
 
-### 3. Conversations API (TODO)
+### 3. Conversations API
 
-- POST /conversations: Create a new conversation (one-on-one or group)
-- GET /conversations: Retrieve a list of user's conversations
-- GET /conversations/{conversationId}: Get details of a specific conversation
-- PUT /conversations/{conversationId}: Update conversation details (e.g., name, participants)
-- DELETE /conversations/{conversationId}: Delete a conversation
+- POST /conversations: Create a new conversation
+    - Requires `ADMIN` or `EDITOR` role
+    - Request body: ConversationCreate schema
+    - Response: Conversation schema
+
+- GET /conversations: Retrieve a list of conversations
+    - Requires `ADMIN` or `EDITOR` role
+    - Query parameters:
+        - disabled: Optional[bool] - Filter by disabled status
+        - sort: "asc" | "desc" | 1 | -1 - Sort order (default: "asc")
+        - start: Optional[str] - Starting `conversation_id` for pagination
+        - before: Optional[str] - End `conversation_id` for pagination
+        - limit: Optional[int] - Number of results to return (default: 20)
+    - Response: Pagination[Conversation] schema
+
+- GET /conversations/{conversation_id}: Get details of a specific conversation
+    - Requires `ADMIN` or `EDITOR` role
+    - Path parameter: `conversation_id`
+    - Response: Conversation schema
+    - Returns 404 if conversation not found
+
+- PUT /conversations/{conversation_id}: Update conversation details
+    - Requires `ADMIN` or `EDITOR` role
+    - Path parameter: `conversation_id`
+    - Request body: ConversationUpdate schema
+    - Response: Updated Conversation schema
+    - Returns 404 if conversation not found
+
+- DELETE /conversations/{conversation_id}: Delete a conversation
+    - Requires `ADMIN` role
+    - Path parameter: `conversation_id`
+    - Query parameter: soft_delete (boolean, default: True)
+    - Response: 204 No Content
 
 ### 4. Messages API (TODO)
 
