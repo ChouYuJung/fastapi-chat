@@ -2,10 +2,11 @@ import logging
 import logging.config
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Text
+from typing import Literal, Optional, Text
 
 import pytz
 from colorama import Fore, Style, init
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 from .version import VERSION
@@ -16,7 +17,9 @@ init(autoreset=True)
 class Settings(BaseSettings):
     app_name: Text = "fastapi-chat"
     app_version: Text = VERSION
-    app_env: Literal["development", "production", "test"] | Text | None = "development"
+    app_env: Literal["development", "production", "test"] | Text | None = Field(
+        default="development"
+    )
     logging_level: Text = "DEBUG"
     logs_dir: Text = "logs"
 
@@ -29,10 +32,17 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # Database
+    DB_URL: Optional[Text] = Field(default=None)
+
     def validate_values(self):
+        if not self.app_env:
+            raise ValueError("Value 'APP_ENV' must be set.")
+        self.app_env = self.app_env.lower()
         if self.app_env not in ("development", "production", "test"):
             raise ValueError(
-                "Value 'APP_ENV' must be one of 'development', 'production', 'test'"
+                "Value 'APP_ENV' must be one of 'development', 'production', "
+                + f"'test', but got '{self.app_env}'."
             )
 
 
