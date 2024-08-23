@@ -2,8 +2,10 @@ import time
 from typing import Annotated, List, Text, Tuple
 
 from app.config import logger
+from app.db._base import DatabaseBase
 from app.db.tokens import fake_token_blacklist, is_token_invalid
-from app.db.users import fake_users_db, get_user
+from app.db.users import get_user
+from app.deps.db import depend_db
 from app.schemas.oauth import PayloadParam, Role, TokenData, User, UserInDB
 from app.utils.oauth import oauth2_scheme, verify_payload, verify_token
 from fastapi import Depends, HTTPException, status
@@ -65,7 +67,8 @@ async def get_current_active_token_payload(
 async def get_current_user(
     token_payload: Annotated[
         Tuple[Text, PayloadParam], Depends(get_current_active_token_payload)
-    ]
+    ],
+    db: DatabaseBase = Depends(depend_db),
 ) -> UserInDB:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -82,7 +85,7 @@ async def get_current_user(
         raise credentials_exception
 
     # Get user from the database
-    user = get_user(fake_users_db, username=token_data.username)
+    user = get_user(db, username=token_data.username)
     if user is None:
         logger.debug(f"User '{token_data.username}' not found")
         raise credentials_exception

@@ -61,7 +61,7 @@ class DatabaseBase:
         start: Optional[Text] = None,
         before: Optional[Text] = None,
         limit: Optional[int] = 20,
-    ) -> Pagination[UserInDB]:
+    ) -> "Pagination[UserInDB]":
         raise NotImplementedError
 
     def update_user(
