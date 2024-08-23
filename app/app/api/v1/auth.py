@@ -186,8 +186,10 @@ async def api_refresh_token(
             await get_current_active_token_payload(
                 await get_current_token_payload(
                     await get_token_payload(form_data.refresh_token)
-                )
-            )
+                ),
+                db=db,
+            ),
+            db=db,
         )
     )
 

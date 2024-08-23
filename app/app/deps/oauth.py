@@ -51,7 +51,7 @@ async def get_current_active_token_payload(
     token_payload: Annotated[
         Tuple[Text, PayloadParam], Depends(get_current_token_payload)
     ],
-    db: DatabaseBase = Depends(depend_db),
+    db: Annotated[DatabaseBase, Depends(depend_db)],
 ) -> Tuple[Text, PayloadParam]:
 
     token = token_payload[0]
@@ -69,7 +69,7 @@ async def get_current_user(
     token_payload: Annotated[
         Tuple[Text, PayloadParam], Depends(get_current_active_token_payload)
     ],
-    db: DatabaseBase = Depends(depend_db),
+    db: Annotated[DatabaseBase, Depends(depend_db)],
 ) -> UserInDB:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
