@@ -1,4 +1,4 @@
-from typing import Annotated, List, Literal, Optional, Text
+from typing import Annotated, Literal, Optional, Text
 
 from app.db.conversations import (
     create_conversation,
@@ -39,7 +39,7 @@ async def api_create_conversation(conversation_create: ConversationCreate):
 @router.get(
     "/conversations",
     dependencies=[Depends(RoleChecker([Role.ADMIN, Role.EDITOR]))],
-    response_model=List[Conversation],
+    response_model=Pagination[Conversation],
 )
 async def api_list_conversations(
     disabled: Optional[bool] = Query(default=None),
@@ -47,7 +47,7 @@ async def api_list_conversations(
     start: Optional[Text] = Query(default=None),
     before: Optional[Text] = Query(default=None),
     limit: Optional[int] = Query(default=20),
-) -> Pagination[Conversation]:
+):
     """List conversations from the database."""
 
     return Pagination[Conversation].model_validate(
@@ -108,7 +108,7 @@ async def api_update_conversation(
 )
 async def api_delete_conversation(
     conversation_id: Annotated[Text, QueryPath(...)],
-    soft_delete: Annotated[bool, Query(default=True)],
+    soft_delete: bool = Query(default=True),
 ):
     """Delete a conversation"""
 
