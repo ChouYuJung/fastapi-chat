@@ -1,7 +1,7 @@
 import json
 from typing import Any, Text
 
-from app.config import settings
+from app.config import logger, settings
 from app.deps.oauth import RoleChecker
 from app.schemas.oauth import Role
 from app.utils.common import is_json_serializable
@@ -40,9 +40,10 @@ def create_app():
     app.include_router(api_router, prefix="/api")
 
     # Set app state
-    from app.db.base import DatabaseBase
+    from app.db._base import DatabaseBase
 
     _db = DatabaseBase.from_url(settings.DB_URL)
+    logger.info(f"Connected to database: {_db}")
     _db.touch()
     set_app_state(app, key="db", value=_db)
 

@@ -7,6 +7,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    environment:
+      - DB_URL=${DB_URL}
     ports:
       - "8880:80"
     networks:

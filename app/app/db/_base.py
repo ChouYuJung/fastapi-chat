@@ -1,4 +1,4 @@
-from typing import Any, Dict, Text
+from typing import Text
 
 from yarl import URL
 
@@ -8,6 +8,8 @@ class DatabaseBase:
 
     @classmethod
     def from_url(cls, url: URL | Text | None):
+        from app.db._memory import DatabaseMemory
+
         db: DatabaseBase
         if url is None:
             db = DatabaseMemory()
@@ -42,14 +44,7 @@ class DatabaseBase:
         pass
 
     def __str__(self) -> Text:
-        return f"{self.__class__.__name__}(url={self.url_safe})"
-
-
-class DatabaseMemory(DatabaseBase):
-    def __init__(self, *arg, **kwargs):
-        self._url = None
-        self._db = {}
-
-    @property
-    def client(self) -> Dict[Text, Any]:
-        return self._db
+        _attr = ""
+        if self.url_safe:
+            _attr = f"url={self.url_safe}"
+        return f"{self.__class__.__name__}({_attr})"
