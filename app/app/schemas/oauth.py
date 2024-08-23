@@ -1,5 +1,6 @@
 import hashlib
 import json
+import time
 from enum import Enum
 from typing import Annotated, Literal, Optional, Required, Text, TypedDict
 
@@ -25,19 +26,23 @@ class Token(BaseModel):
     access_token: Text
     refresh_token: Text
     token_type: Literal["bearer"] | Text
+    expires_at: int
 
     @classmethod
-    def from_bearer_token(cls, access_token: Text, refresh_token: Text) -> "Token":
+    def from_bearer_token(
+        cls, access_token: Text, refresh_token: Text, expires_at: int
+    ) -> "Token":
         return cls.model_validate(
             {
                 "access_token": access_token,
                 "refresh_token": refresh_token,
                 "token_type": "bearer",
+                "expires_at": expires_at,
             }
         )
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Token):
+        if not isinstance(other, self.__class__):
             return False
         return self.md5() == other.md5()
 
@@ -45,6 +50,21 @@ class Token(BaseModel):
         return hashlib.md5(
             json.dumps(self.model_dump(), sort_keys=True, default=str).encode("utf-8")
         ).hexdigest()
+
+    def to_db_model(self, *, username: Text, expires_at: int) -> "TokenInDB":
+        token_data = self.model_dump()
+        token_data["username"] = username
+        return TokenInDB.model_validate(token_data)
+
+
+class TokenInDB(Token):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    username: Text
+
+
+class TokenBlacklisted(BaseModel):
+    token: Text
+    created_at: int = Field(default_factory=lambda: int(time.time()))
 
 
 class RefreshTokenRequest(BaseModel):

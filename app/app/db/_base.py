@@ -3,7 +3,14 @@ from typing import TYPE_CHECKING, Literal, Optional, Text
 from yarl import URL
 
 if TYPE_CHECKING:
-    from app.schemas.oauth import UserCreate, UserInDB, UserUpdate
+    from app.schemas.oauth import (
+        Token,
+        TokenBlacklisted,
+        TokenInDB,
+        UserCreate,
+        UserInDB,
+        UserUpdate,
+    )
     from app.schemas.pagination import Pagination
 
 
@@ -72,6 +79,18 @@ class DatabaseBase:
     def create_user(
         self, *, user_create: "UserCreate", hashed_password: Text
     ) -> Optional["UserInDB"]:
+        raise NotImplementedError
+
+    def retrieve_cached_token(self, username: Text) -> Optional["TokenInDB"]:
+        raise NotImplementedError
+
+    def save_token(self, username: Text, token: Token) -> Optional["TokenInDB"]:
+        raise NotImplementedError
+
+    def invalidate_token(self, token: Optional["Token"]):
+        raise NotImplementedError
+
+    def is_token_blocked(self, token: Text) -> bool:
         raise NotImplementedError
 
     def __str__(self) -> Text:

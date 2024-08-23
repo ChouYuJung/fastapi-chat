@@ -2,8 +2,10 @@ from datetime import timedelta
 from typing import Annotated, Text, Tuple
 
 from app.config import logger, settings
-from app.db.tokens import fake_token_db, get_token, logout_user, save_token
-from app.db.users import create_user, fake_users_db
+from app.db._base import DatabaseBase
+from app.db.tokens import caching_token, get_cached_token, invalidate_token
+from app.db.users import create_user
+from app.deps.db import depend_db
 from app.deps.oauth import (
     get_current_active_token_payload,
     get_current_active_user,
@@ -19,7 +21,7 @@ from app.schemas.oauth import (
 )
 from app.utils.oauth import (
     authenticate_user,
-    create_access_and_refresh_tokens,
+    create_token_model,
     get_password_hash,
     is_token_expired,
     validate_client,
@@ -51,14 +53,16 @@ async def api_register(
                 },
             },
         },
-    )
+    ),
+    db: DatabaseBase = Depends(depend_db),
 ) -> Token:
     """Register a new user with the given username and password."""
 
     # Create a new user with the given username and password.
-    user = user_guest_register.to_user()
     created_user = create_user(
-        user=user, hashed_password=get_password_hash(user_guest_register.password)
+        db,
+        user_create=user_guest_register,
+        hashed_password=get_password_hash(user_guest_register.password),
     )
     if created_user is None:
         raise HTTPException(
@@ -66,30 +70,30 @@ async def api_register(
         )
 
     # Create an access token for the new user.
-    access_token, refresh_token = create_access_and_refresh_tokens(
+    token = create_token_model(
         data={"sub": created_user.username, "role": created_user.role},
         access_token_expires_delta=timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         ),
         refresh_token_expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
-    token = Token.from_bearer_token(
-        access_token=access_token, refresh_token=refresh_token
-    )
 
     # Save the token to the database.
-    save_token(fake_token_db, username=created_user.username, token=token)
+    caching_token(db, username=created_user.username, token=token)
 
     # Return the access token.
     return token
 
 
 @router.post("/login", response_model=Token)
-async def api_login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
+async def api_login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: DatabaseBase = Depends(depend_db),
+) -> Token:
     """Authenticate a user with the given username and password."""
 
     # Authenticate the user with the given username and password.
-    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
+    user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         logger.debug(f"User '{form_data.username}' failed to authenticate")
         raise HTTPException(
@@ -99,25 +103,22 @@ async def api_login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
         )
 
     # Return if token active
-    token = get_token(fake_token_db, username=user.username)
+    token = get_cached_token(db, username=user.username)
     if token is not None and is_token_expired(token.access_token) is False:
         logger.debug(f"User '{form_data.username}' already has a token")
         return token
 
     # Create an access token for the authenticated user.
-    access_token, refresh_token = create_access_and_refresh_tokens(
+    token = create_token_model(
         data={"sub": user.username, "role": user.role},
         access_token_expires_delta=timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         ),
         refresh_token_expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
-    token = Token.from_bearer_token(
-        access_token=access_token, refresh_token=refresh_token
-    )
 
     # Save the token to the database.
-    save_token(fake_token_db, username=user.username, token=token)
+    caching_token(db, username=user.username, token=token)
 
     # Return the access token.
     return token
@@ -127,8 +128,8 @@ async def api_login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
 async def api_logout(
     token_payload: Annotated[
         Tuple[Text, PayloadParam], Depends(get_current_active_token_payload)
-    ]
-    # token: Annotated[Text, Depends(oauth2_scheme)]
+    ],
+    db: DatabaseBase = Depends(depend_db),
 ):
     """Invalidate the token for the given user."""
 
@@ -143,8 +144,11 @@ async def api_logout(
     if not isinstance(username, Text):
         raise credentials_exception
 
+    token = get_cached_token(db, username=username)
+
     # Logout user and invalidate the token.
-    logout_user(fake_token_db, username=username, with_invalidate_token=True)
+    if token is not None:
+        invalidate_token(db, token=token)
 
     # Return a response.
     return JSONResponse(
@@ -158,7 +162,10 @@ async def api_logout(
 
 
 @router.post("/refresh-token", response_model=Token)
-async def api_refresh_token(form_data: RefreshTokenRequest = Body(...)):
+async def api_refresh_token(
+    form_data: RefreshTokenRequest = Body(...),
+    db: DatabaseBase = Depends(depend_db),
+):
     """Refresh the access token for the current user."""
 
     # Validate grant_type
@@ -185,22 +192,20 @@ async def api_refresh_token(form_data: RefreshTokenRequest = Body(...)):
     )
 
     # Create a new access token for the user
-    access_token, refresh_token = create_access_and_refresh_tokens(
+    token = create_token_model(
         data={"sub": user.username, "role": user.role},
         access_token_expires_delta=timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         ),
         refresh_token_expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
-    token = Token.from_bearer_token(
-        access_token=access_token, refresh_token=refresh_token
-    )
-
-    # Invalidate the old token
-    logout_user(fake_token_db, username=user.username, with_invalidate_token=True)
-
     # Save the new token to the database
-    save_token(fake_token_db, username=user.username, token=token)
+    caching_token(db, username=user.username, token=token)
+
+    # Logout user and invalidate the token.
+    token_old = get_cached_token(db, username=user.username)
+    if token_old is not None:
+        invalidate_token(db, token=token_old)
 
     # Return the new access token
     return token

@@ -2,12 +2,21 @@ from types import MappingProxyType
 from typing import List, Literal, Optional, Text, TypedDict
 
 from app.db._base import DatabaseBase
-from app.schemas.oauth import UserCreate, UserInDB, UserUpdate
+from app.schemas.oauth import (
+    Token,
+    TokenBlacklisted,
+    TokenInDB,
+    UserCreate,
+    UserInDB,
+    UserUpdate,
+)
 from app.schemas.pagination import Pagination
 
 
 class _BD(TypedDict):
     users: List["UserInDB"]
+    cached_tokens: List["TokenInDB"]
+    blacklisted_tokens: List["TokenBlacklisted"]
 
 
 class DatabaseMemory(DatabaseBase):
@@ -51,6 +60,8 @@ class DatabaseMemory(DatabaseBase):
                 UserInDB.model_validate(u)
                 for u in dict(self.fake_users_data_init).values()
             ],
+            cached_tokens=[],
+            blacklisted_tokens=[],
         )
 
     @property
@@ -131,3 +142,35 @@ class DatabaseMemory(DatabaseBase):
         user_db = user.to_db_model(hashed_password=hashed_password)
         self._db["users"].append(user_db)
         return user_db
+
+    def retrieve_cached_token(self, username: Text) -> Optional["TokenInDB"]:
+        for token in self._db["cached_tokens"]:
+            if token.username == username and not self.is_token_blocked(
+                token.access_token
+            ):
+                return token
+        return None
+
+    def save_token(self, username: Text, token: Token) -> Optional["TokenInDB"]:
+        token_db = self.retrieve_cached_token(username)
+        if token_db:
+            return None
+        token_db = token.to_db_model(username=username, expires_at=time.time() + )
+        self._db["cached_tokens"].append(token_db)
+        return token_db
+
+    def invalidate_token(self, token: Optional["Token"]):
+        if token is None:
+            return
+        self._db["blacklisted_tokens"].append(
+            TokenBlacklisted.model_validate({"token": token.access_token})
+        )
+        self._db["blacklisted_tokens"].append(
+            TokenBlacklisted.model_validate({"token": token.refresh_token})
+        )
+
+    def is_token_blocked(self, token: Text) -> bool:
+        for blacklisted_token in self._db["blacklisted_tokens"]:
+            if blacklisted_token.token == token:
+                return True
+        return False

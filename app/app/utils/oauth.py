@@ -1,13 +1,16 @@
 import time
 from datetime import UTC, datetime, timedelta
-from typing import Dict, Optional, Text, Tuple
+from typing import TYPE_CHECKING, Dict, Optional, Text
 
 from app.config import settings
 from app.db.users import get_user
-from app.schemas.oauth import PayloadParam, UserInDB
+from app.schemas.oauth import PayloadParam, Token, UserInDB
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+
+if TYPE_CHECKING:
+    from app.db._base import DatabaseBase
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -24,10 +27,12 @@ def get_password_hash(password: Text | bytes) -> Text:
     return pwd_context.hash(password)
 
 
-def authenticate_user(fake_db, username: Text, password: Text) -> Optional["UserInDB"]:
+def authenticate_user(
+    db: "DatabaseBase", username: Text, password: Text
+) -> Optional["UserInDB"]:
     """Authenticate a user with the given username and password."""
 
-    user = get_user(fake_db, username)
+    user = get_user(db, username=username)
     if not user:
         return None
     if not verify_password(password, user.hashed_password):
@@ -37,6 +42,8 @@ def authenticate_user(fake_db, username: Text, password: Text) -> Optional["User
 
 def create_token(
     data: Dict,
+    *,
+    expire: datetime | float | int | None = None,
     expires_delta: Optional[timedelta] = None,
     key: Text = settings.SECRET_KEY,
     algorithm: Text = settings.ALGORITHM,
@@ -44,30 +51,42 @@ def create_token(
     """Create an access token with the given data."""
 
     to_encode = data.copy()
-    expire = datetime.now(UTC) + (
-        expires_delta if expires_delta else timedelta(minutes=15)
-    )
-    to_encode.update({"exp": expire})
+    if expire is not None:
+        expires_at = (
+            int(expire.timestamp()) if isinstance(expire, datetime) else int(expire)
+        )
+    else:
+        expire_at_dt = datetime.now(UTC) + (
+            expires_delta if expires_delta else timedelta(minutes=15)
+        )
+        expires_at = int(expire_at_dt.timestamp())
+    to_encode.update({"exp": expires_at})
     encoded_jwt = jwt.encode(to_encode, key, algorithm=algorithm)
     return encoded_jwt
 
 
-def create_access_and_refresh_tokens(
+def create_token_model(
     data: Dict,
     access_token_expires_delta: Optional[timedelta] = None,
     refresh_token_expires_delta: Optional[timedelta] = None,
     key: Text = settings.SECRET_KEY,
     algorithm: Text = settings.ALGORITHM,
-) -> Tuple[Text, Text]:
+) -> Token:
     """Create an access token and a refresh token with the given data."""
 
-    access_token = create_token(
-        data, expires_delta=access_token_expires_delta, key=key, algorithm=algorithm
+    expires_at_dt = datetime.now(UTC) + (
+        access_token_expires_delta
+        if access_token_expires_delta
+        else timedelta(minutes=15)
     )
+    expires_at = int(expires_at_dt.timestamp())
+    access_token = create_token(data, expire=expires_at, key=key, algorithm=algorithm)
     refresh_token = create_token(
         data, expires_delta=refresh_token_expires_delta, key=key, algorithm=algorithm
     )
-    return (access_token, refresh_token)
+    return Token.from_bearer_token(
+        access_token=access_token, refresh_token=refresh_token, expires_at=expires_at
+    )
 
 
 def verify_token(token: Text) -> Optional[Dict]:

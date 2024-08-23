@@ -3,7 +3,6 @@ from typing import Annotated, List, Text, Tuple
 
 from app.config import logger
 from app.db._base import DatabaseBase
-from app.db.tokens import fake_token_blacklist, is_token_invalid
 from app.db.users import get_user
 from app.deps.db import depend_db
 from app.schemas.oauth import PayloadParam, Role, TokenData, User, UserInDB
@@ -50,11 +49,12 @@ async def get_current_token_payload(
 async def get_current_active_token_payload(
     token_payload: Annotated[
         Tuple[Text, PayloadParam], Depends(get_current_token_payload)
-    ]
+    ],
+    db: DatabaseBase = Depends(depend_db),
 ) -> Tuple[Text, PayloadParam]:
 
     token = token_payload[0]
-    if is_token_invalid(fake_token_blacklist, token=token):
+    if is_token_invalid(db, token=token):
         logger.debug(f"Token '{token}' has been invalidated")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -135,7 +135,9 @@ def RoleChecker(allowed_roles: List[Role]):
     >>>     return {"message": "Admin access granted"}
     """
 
-    async def check_role(token: Text = Depends(oauth2_scheme)):
+    async def check_role(
+        token: Text = Depends(oauth2_scheme), db: DatabaseBase = Depends(depend_db)
+    ):
         # Verify the token and check the user's role.
         payload = verify_token(token)
         if payload is None:
@@ -143,7 +145,7 @@ def RoleChecker(allowed_roles: List[Role]):
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
             )
         # Check if the token is in the blacklist.
-        if is_token_invalid(fake_token_blacklist, token=token):
+        if is_token_invalid(db, token=token):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token has been invalidated",

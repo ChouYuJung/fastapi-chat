@@ -1,50 +1,35 @@
 from typing import TYPE_CHECKING, Annotated, Dict, Optional, Set, Text
 
 if TYPE_CHECKING:
-    from app.schemas.oauth import Token
+    from app.db._base import DatabaseBase
+    from app.schemas.oauth import Token, TokenInDB
 
-fake_token_db: Annotated[Dict[Text, "Token"], "username: token"] = {}
+# fake_token_db: Annotated[Dict[Text, "Token"], "username: token"] = {}
 
-fake_token_blacklist: Set[Text] = set()
+# fake_token_blacklist: Set[Text] = set()
 
 
-def save_token(
-    db=fake_token_db, *, username: Text, token: "Token"
+def caching_token(
+    db: "DatabaseBase", *, username: Text, token: "Token"
 ) -> Optional["Token"]:
     """Create a new token for the given user."""
 
-    if get_token(db, username=username) == token:
-        return None  # Token already exists
-    db[username] = token
-    return token
+    return db.save_token(username=username, token=token)
 
 
-def get_token(db=fake_token_db, *, username: Text) -> Optional["Token"]:
+def get_cached_token(db: "DatabaseBase", *, username: Text) -> Optional["TokenInDB"]:
     """Get the token for the given user."""
 
-    return db.get(username)
+    return db.retrieve_cached_token(username)
 
 
-def invalidate_token(db=fake_token_blacklist, *, token: Optional["Token"]):
+def invalidate_token(db: "DatabaseBase", *, token: Optional["Token"]):
     """Invalidate the token for the given user."""
 
-    if token is None:
-        return
-    db.add(token.access_token)
-    db.add(token.refresh_token)
+    db.invalidate_token(token)
 
 
-def is_token_invalid(db=fake_token_blacklist, *, token: Text) -> bool:
+def is_token_blocked(db: "DatabaseBase", *, token: Text) -> bool:
     """Check if the token is in the blacklist."""
 
-    return token in db
-
-
-def logout_user(
-    db=fake_token_db, *, username: Text, with_invalidate_token: bool = True
-) -> Optional["Token"]:
-    """Logout the user by deleting the token."""
-
-    should_invalid_token = db.pop(username, None)
-    if with_invalidate_token is True:
-        invalidate_token(token=should_invalid_token)
+    return db.is_token_blocked(token)
