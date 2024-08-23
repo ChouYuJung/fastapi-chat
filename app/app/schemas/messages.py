@@ -23,10 +23,7 @@ class MessageReaction(BaseModel):
 
 class Message(BaseModel):
     # IDs
-    id: Text = Field(
-        default_factory=lambda: str(uuid.uuid7()),
-        description="Message ID in UUID Version 7 format",
-    )
+    id: Text = Field(..., description="Message ID in UUID Version 7 format")
     conversation_id: Text = Field(..., description="ID of the conversation")
     sender_id: Text = Field(..., description="ID of the sender")
     # Metadata
@@ -49,14 +46,15 @@ class Message(BaseModel):
 
 class MessageCreate(BaseModel):
     conversation_id: Text
+    sender_id: Text
     content: Text
     type: MessageType = Field(default=MessageType.TEXT)
     reply_to: Optional[Text] = None
     metadata: Optional[Dict[Text, Any]] = None
 
-    def to_message(self, sender_id: Text) -> Message:
+    def to_message(self, message_id: Optional[Text] = None) -> Message:
         msg_create_data = self.model_dump()
-        msg_create_data["sender_id"] = sender_id
+        msg_create_data["id"] = message_id or str(uuid.uuid7())
         return Message.model_validate(msg_create_data)
 
 
