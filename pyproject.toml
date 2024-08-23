@@ -8,6 +8,7 @@ readme = "README.md"
 version = "0.2.0"
 
 [tool.poetry.dependencies]
+aiohttp = "*"
 colorama = "*"
 cryptography = "*"
 fastapi = { extras = ["all"], version = "*" }
@@ -22,6 +23,7 @@ pytz = "*"
 rich = "*"
 uuid-utils = "*"
 uvicorn = { extras = ["standard"], version = "*" }
+yarl = "*"
 
 [tool.poetry.extras]
 all = []
