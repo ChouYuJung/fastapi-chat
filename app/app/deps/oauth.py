@@ -6,7 +6,7 @@ from app.db._base import DatabaseBase
 from app.db.tokens import is_token_blocked
 from app.db.users import get_user
 from app.deps.db import depend_db
-from app.schemas.oauth import PayloadParam, Role, TokenData, User, UserInDB
+from app.schemas.oauth import PayloadParam, Permission, Role, TokenData, User, UserInDB
 from app.utils.oauth import oauth2_scheme, verify_payload, verify_token
 from fastapi import Depends, HTTPException, status
 
@@ -104,59 +104,44 @@ async def get_current_active_user(
     return current_user
 
 
-def RoleChecker(allowed_roles: List[Role]):
-    """
-    Decorator function for role-based access control.
+def require_permissions(required_permissions: List[Permission]):
+    def get_current_active_user_permissions(
+        current_user: User = Depends(get_current_active_user),
+    ) -> User:
+        if Permission.MANAGE_ALL_RESOURCES in current_user.role.permissions:
+            return current_user  # Super Admin has all permissions
 
-    This function checks if the user's role, extracted from the JWT token,
-    is included in the list of allowed roles. If not, raises an HTTP
-    exception.
+        if not set(required_permissions).issubset(set(current_user.role.permissions)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+            )
 
-    Parameters
-    ----------
-    allowed_roles : List[Role]
-        A list of allowed roles for the decorated endpoint.
+        return current_user
 
-    Returns
-    -------
-    Callable
-        The inner function `check_role` that performs the actual role check.
+    return get_current_active_user_permissions
 
-    Raises
-    ------
-    HTTPException
-        * Status code 401 (Unauthorized) if the token is invalid.
-        * Status code 403 (Forbidden) if the user's role is not allowed.
 
-    Examples
-    --------
-    >>> from app.schemas.oauth import Role
-    >>> @app.get("/admin", dependencies=[Depends(RoleChecker([Role.ADMIN]))])
-    >>> async def admin_endpoint():
-    >>>     return {"message": "Admin access granted"}
-    """
-
-    async def check_role(
-        token: Text = Depends(oauth2_scheme), db: DatabaseBase = Depends(depend_db)
+def PermissionChecker(required_permissions: List[Permission]):
+    async def check_permission(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        db: DatabaseBase = Depends(depend_db),
     ):
-        # Verify the token and check the user's role.
-        payload = verify_token(token)
-        if payload is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-            )
-        # Check if the token is in the blacklist.
-        if is_token_blocked(db, token=token):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token has been invalidated",
-            )
-        # Check if the user's role is allowed.
-        role = payload.get("role")
-        if role not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Operation not permitted"
-            )
-        return payload
+        if Permission.MANAGE_ALL_RESOURCES in current_user.role.permissions:
+            return  # Super Admin has all permissions
 
-    return check_role
+        if not set(required_permissions).issubset(set(current_user.role.permissions)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+            )
+
+        # Additional checks for organization-specific permissions
+        if (
+            Permission.MANAGE_ORG_CONTENT in required_permissions
+            or Permission.MANAGE_ORG_USERS in required_permissions
+        ):
+            # Ensure the user is operating within their own organization
+            # Implement this logic based on your specific requirements
+            # TODO:
+            pass
+
+    return check_permission
