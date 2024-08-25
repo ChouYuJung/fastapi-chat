@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     logs_dir: Text = "logs"
 
     # OAuth2
-    token_url: Text = "api/v1/auth/login"
+    token_url: Text = "/auth/login"
     SECRET_KEY: Text = (
         "ce7ea672b396d1e36d1b64d725414bee9529a84c8a73ba32fd0eb57e7298a5fa"
     )

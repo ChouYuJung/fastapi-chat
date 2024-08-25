@@ -32,6 +32,7 @@ class RefreshToken(BaseModel):
     refresh_token: Text
 
 
+@router.post("/token", response_model=Token)
 @router.post("/login", response_model=Token)
 async def api_login(
     form_data: OAuth2PasswordRequestForm = Depends(),
