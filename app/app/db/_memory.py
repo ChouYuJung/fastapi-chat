@@ -1,5 +1,5 @@
 from types import MappingProxyType
-from typing import List, Literal, Optional, Text, TypedDict
+from typing import List, Literal, Optional, Sequence, Text, TypedDict
 
 from app.db._base import DatabaseBase
 from app.schemas.oauth import (
@@ -160,6 +160,8 @@ class DatabaseMemory(DatabaseBase):
         self,
         *,
         organization_id: Optional[Text] = None,
+        role: Optional[Text] = None,
+        roles: Optional[Sequence[Text]] = None,
         disabled: Optional[bool] = None,
         sort: Literal["asc", "desc", 1, -1] = "asc",
         start: Optional[Text] = None,
@@ -170,6 +172,10 @@ class DatabaseMemory(DatabaseBase):
         users = self._db["users"]
         if organization_id is not None:
             users = [user for user in users if user.organization_id == organization_id]
+        if role is not None:
+            users = [user for user in users if user.role == role]
+        if roles is not None:
+            users = [user for user in users if user.role in roles]
         if disabled is not None:
             users = [user for user in users if user.disabled == disabled]
         if sort in ("asc", 1):

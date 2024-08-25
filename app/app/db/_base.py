@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal, Optional, Text
+from typing import TYPE_CHECKING, Literal, Optional, Sequence, Text
 
 from yarl import URL
 
@@ -98,6 +98,8 @@ class DatabaseBase:
         self,
         *,
         organization_id: Optional[Text] = None,
+        role: Optional[Text] = None,
+        roles: Optional[Sequence[Text]] = None,
         disabled: Optional[bool] = None,
         sort: Literal["asc", "desc", 1, -1] = "asc",
         start: Optional[Text] = None,
