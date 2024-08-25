@@ -32,8 +32,8 @@ class RefreshToken(BaseModel):
     refresh_token: Text
 
 
-@router.post("/token", response_model=Token)
-@router.post("/login", response_model=Token)
+@router.post("/auth/token", response_model=Token)
+@router.post("/auth/login", response_model=Token)
 async def api_login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: DatabaseBase = Depends(depend_db),
@@ -76,7 +76,7 @@ async def api_login(
     return token
 
 
-@router.post("/logout")
+@router.post("/auth/logout")
 async def api_logout(
     token_payload: Annotated[
         Tuple[Text, PayloadParam], Depends(get_current_active_token_payload)
@@ -113,7 +113,7 @@ async def api_logout(
     )
 
 
-@router.post("/refresh-token", response_model=Token)
+@router.post("/auth/refresh-token", response_model=Token)
 async def api_refresh_token(
     form_data: RefreshTokenRequest = Body(...),
     db: DatabaseBase = Depends(depend_db),
