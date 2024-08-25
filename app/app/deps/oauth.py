@@ -1,5 +1,5 @@
 import time
-from typing import Annotated, List, Text, Tuple
+from typing import Annotated, List, Text, Tuple, TypeAlias
 
 from app.config import logger
 from app.db._base import DatabaseBase
@@ -21,10 +21,12 @@ from fastapi import Path as QueryPath
 from fastapi import status
 from pydantic_core import ValidationError
 
+TYPE_TOKEN_PAYLOAD: TypeAlias = Tuple[Text, PayloadParam]
+TYPE_TOKEN_PAYLOAD_DATA: TypeAlias = Tuple[Text, PayloadParam, TokenData]
+TYPE_TOKEN_PAYLOAD_DATA_USER: TypeAlias = Tuple[Text, PayloadParam, TokenData, UserInDB]
 
-async def get_token_payload(
-    token: Text = Depends(oauth2_scheme),
-) -> Tuple[Text, PayloadParam]:
+
+async def get_token_payload(token: Text = Depends(oauth2_scheme)) -> TYPE_TOKEN_PAYLOAD:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -45,8 +47,8 @@ async def get_token_payload(
 
 
 async def get_current_token_payload(
-    token_payload: Annotated[Tuple[Text, PayloadParam], Depends(get_token_payload)]
-) -> Tuple[Text, PayloadParam]:
+    token_payload: Annotated[TYPE_TOKEN_PAYLOAD, Depends(get_token_payload)]
+) -> TYPE_TOKEN_PAYLOAD:
     payload = token_payload[1]
     if time.time() > payload["exp"]:
         logger.debug(f"Token '{token_payload[0]}' has expired at {payload['exp']}")
@@ -59,11 +61,9 @@ async def get_current_token_payload(
 
 
 async def get_current_active_token_payload(
-    token_payload: Annotated[
-        Tuple[Text, PayloadParam], Depends(get_current_token_payload)
-    ],
+    token_payload: Annotated[TYPE_TOKEN_PAYLOAD, Depends(get_current_token_payload)],
     db: Annotated[DatabaseBase, Depends(depend_db)],
-) -> Tuple[Text, PayloadParam]:
+) -> TYPE_TOKEN_PAYLOAD:
 
     token = token_payload[0]
     if is_token_blocked(db, token=token):
@@ -78,9 +78,9 @@ async def get_current_active_token_payload(
 
 async def get_current_active_token_payload_data(
     token_payload: Annotated[
-        Tuple[Text, PayloadParam], Depends(get_current_active_token_payload)
+        TYPE_TOKEN_PAYLOAD, Depends(get_current_active_token_payload)
     ],
-) -> Tuple[Text, PayloadParam, TokenData]:
+) -> TYPE_TOKEN_PAYLOAD_DATA:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -104,11 +104,10 @@ async def get_current_active_token_payload_data(
 
 async def get_current_user(
     token_payload_data: Annotated[
-        Tuple[Text, PayloadParam, TokenData],
-        Depends(get_current_active_token_payload_data),
+        TYPE_TOKEN_PAYLOAD_DATA, Depends(get_current_active_token_payload_data)
     ],
     db: Annotated[DatabaseBase, Depends(depend_db)],
-) -> Tuple[Text, PayloadParam, TokenData, UserInDB]:
+) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -129,9 +128,9 @@ async def get_current_user(
 
 async def get_current_active_user(
     token_payload_data_user: Annotated[
-        Tuple[Text, PayloadParam, TokenData, UserInDB], Depends(get_current_user)
+        TYPE_TOKEN_PAYLOAD_DATA_USER, Depends(get_current_user)
     ]
-):
+) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
     current_user = token_payload_data_user[3]
     if current_user.disabled:
         logger.debug(f"User '{current_user.username}' is inactive")
@@ -143,10 +142,10 @@ async def get_current_active_user_of_org(
     org_id: Text = QueryPath(
         ..., description="The ID of the organization to retrieve."
     ),
-    token_payload_data_user: Tuple[Text, PayloadParam, TokenData, UserInDB] = Depends(
+    token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
         get_current_active_user
     ),
-):
+) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
     user = token_payload_data_user[3]
 
     if user.role in (Role.SUPER_ADMIN, Role.PLATFORM_ADMIN):
@@ -167,11 +166,11 @@ def get_user_with_required_permissions(required_permissions: List[Permission]):
     """Check if the current user has the required permissions."""
 
     def get_current_active_user_permissions(
-        token_payload_data_user: Tuple[
-            Text, PayloadParam, TokenData, UserInDB
-        ] = Depends(get_current_active_user),
+        token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
+            get_current_active_user
+        ),
         # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
-    ) -> Tuple[Text, PayloadParam, TokenData, UserInDB]:
+    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
         user = token_payload_data_user[3]
         user_permissions = ROLE_PERMISSIONs[user.role].permissions
         logger.debug(
@@ -204,11 +203,11 @@ def get_user_of_org_with_required_permissions(required_permissions: List[Permiss
     """Check if the current user has the required permissions."""
 
     def get_current_active_user_of_org_permissions(
-        token_payload_data_user: Tuple[
-            Text, PayloadParam, TokenData, UserInDB
-        ] = Depends(get_current_active_user_of_org),
+        token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
+            get_current_active_user_of_org
+        ),
         # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
-    ) -> Tuple[Text, PayloadParam, TokenData, UserInDB]:
+    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
         user = token_payload_data_user[3]
         user_permissions = ROLE_PERMISSIONs[user.role].permissions
         logger.debug(
