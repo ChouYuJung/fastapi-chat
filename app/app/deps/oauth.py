@@ -24,6 +24,9 @@ from pydantic_core import ValidationError
 TYPE_TOKEN_PAYLOAD: TypeAlias = Tuple[Text, PayloadParam]
 TYPE_TOKEN_PAYLOAD_DATA: TypeAlias = Tuple[Text, PayloadParam, TokenData]
 TYPE_TOKEN_PAYLOAD_DATA_USER: TypeAlias = Tuple[Text, PayloadParam, TokenData, UserInDB]
+TYPE_TOKEN_PAYLOAD_DATA_USER_ORG: TypeAlias = Tuple[
+    Text, PayloadParam, TokenData, UserInDB, Text
+]
 
 
 async def get_token_payload(token: Text = Depends(oauth2_scheme)) -> TYPE_TOKEN_PAYLOAD:
@@ -145,7 +148,7 @@ async def get_current_active_user_of_org(
     token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
         get_current_active_user
     ),
-) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
+) -> TYPE_TOKEN_PAYLOAD_DATA_USER_ORG:
     user = token_payload_data_user[3]
 
     if user.role in (Role.SUPER_ADMIN, Role.PLATFORM_ADMIN):
@@ -159,7 +162,13 @@ async def get_current_active_user_of_org(
             status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
         )
 
-    return token_payload_data_user
+    return (
+        token_payload_data_user[0],
+        token_payload_data_user[1],
+        token_payload_data_user[2],
+        user,
+        org_id,
+    )
 
 
 def get_user_with_required_permissions(required_permissions: List[Permission]):
@@ -203,12 +212,12 @@ def get_user_of_org_with_required_permissions(required_permissions: List[Permiss
     """Check if the current user has the required permissions."""
 
     def get_current_active_user_of_org_permissions(
-        token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
+        token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
             get_current_active_user_of_org
         ),
         # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
-    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
-        user = token_payload_data_user[3]
+    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER_ORG:
+        user = token_payload_data_user_org[3]
         user_permissions = ROLE_PERMISSIONs[user.role].permissions
         logger.debug(
             f"User '{user.username}' with role '{user.role}' "
@@ -217,7 +226,7 @@ def get_user_of_org_with_required_permissions(required_permissions: List[Permiss
 
         # Check if the user has the required permissions
         if Permission.MANAGE_ALL_RESOURCES in user_permissions:
-            return token_payload_data_user  # Super Admin has all permissions
+            return token_payload_data_user_org  # Super Admin has all permissions
 
         if not set(required_permissions).issubset(set(user_permissions)):
             raise HTTPException(
@@ -231,7 +240,7 @@ def get_user_of_org_with_required_permissions(required_permissions: List[Permiss
         ):
             pass
 
-        return token_payload_data_user
+        return token_payload_data_user_org
 
     return get_current_active_user_of_org_permissions
 
