@@ -38,53 +38,6 @@ class RefreshToken(BaseModel):
     refresh_token: Text
 
 
-@router.post("/register", response_model=Token)
-async def api_register(
-    user_guest_register: UserGuestRegister = Body(
-        ...,
-        openapi_examples={
-            "guest_user": {
-                "summary": "Create a new guest user",
-                "value": {
-                    "username": "new_guest",
-                    "password": "pass1234",
-                    "full_name": "Guest User",
-                    "email": "guest@example.com",
-                },
-            },
-        },
-    ),
-    db: DatabaseBase = Depends(depend_db),
-) -> Token:
-    """Register a new user with the given username and password."""
-
-    # Create a new user with the given username and password.
-    created_user = create_user(
-        db,
-        user_create=user_guest_register,
-        hashed_password=get_password_hash(user_guest_register.password),
-    )
-    if created_user is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="User already exists"
-        )
-
-    # Create an access token for the new user.
-    token = create_token_model(
-        data={"sub": created_user.username, "role": created_user.role},
-        access_token_expires_delta=timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        ),
-        refresh_token_expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-    )
-
-    # Save the token to the database.
-    caching_token(db, username=created_user.username, token=token)
-
-    # Return the access token.
-    return token
-
-
 @router.post("/login", response_model=Token)
 async def api_login(
     form_data: OAuth2PasswordRequestForm = Depends(),

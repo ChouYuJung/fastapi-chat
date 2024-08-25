@@ -7,10 +7,10 @@ from app.db.tokens import is_token_blocked
 from app.db.users import get_user
 from app.deps.db import depend_db
 from app.schemas.oauth import (
+    ROLE_PERMISSIONS,
     PayloadParam,
     Permission,
     Role,
-    ROLE_PERMISSIONs,
     TokenData,
     User,
     UserInDB,
@@ -181,7 +181,7 @@ def get_user_with_required_permissions(required_permissions: List[Permission]):
         # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
     ) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
         user = token_payload_data_user[3]
-        user_permissions = ROLE_PERMISSIONs[user.role].permissions
+        user_permissions = ROLE_PERMISSIONS[user.role].permissions
         logger.debug(
             f"User '{user.username}' with role '{user.role}' "
             + f"has permissions '{user_permissions}'"
@@ -218,7 +218,7 @@ def get_user_of_org_with_required_permissions(required_permissions: List[Permiss
         # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
     ) -> TYPE_TOKEN_PAYLOAD_DATA_USER_ORG:
         user = token_payload_data_user_org[3]
-        user_permissions = ROLE_PERMISSIONs[user.role].permissions
+        user_permissions = ROLE_PERMISSIONS[user.role].permissions
         logger.debug(
             f"User '{user.username}' with role '{user.role}' "
             + f"has permissions '{user_permissions}'"
@@ -252,7 +252,7 @@ def PermissionChecker(required_permissions: List[Permission]):
         current_user: Annotated[User, Depends(get_current_active_user)],
         # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
     ) -> None:
-        user_permissions = ROLE_PERMISSIONs[current_user.role].permissions
+        user_permissions = ROLE_PERMISSIONS[current_user.role].permissions
         logger.debug(
             f"User '{current_user.username}' with role '{current_user.role}' "
             + f"has permissions '{user_permissions}'"

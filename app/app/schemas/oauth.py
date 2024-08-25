@@ -111,13 +111,13 @@ class RolePermissionOrgGuest(RolePermission):
     authority_level: Literal[0] = Field(default=0)
 
 
-_ROLE_PERMISSIONs: Dict[Role, RolePermission] = {
+_ROLE_PERMISSIONS: Dict[Role, RolePermission] = {
     Role.SUPER_ADMIN: RolePermissionSuperAdmin(),
     Role.PLATFORM_ADMIN: RolePermissionPlatformAdmin(),
     Role.ORG_ADMIN: RolePermissionOrgAdmin(),
     Role.ORG_USER: RolePermissionOrgUser(),
 }
-ROLE_PERMISSIONs = MappingProxyType(_ROLE_PERMISSIONs)
+ROLE_PERMISSIONS = MappingProxyType(_ROLE_PERMISSIONS)
 
 
 class Organization(BaseModel):
