@@ -9,7 +9,6 @@ from app.deps.db import depend_db
 from app.schemas.oauth import (
     PayloadParam,
     Permission,
-    Role,
     ROLE_PERMISSIONs,
     TokenData,
     User,
@@ -112,7 +111,7 @@ async def get_current_active_user(
     return current_user
 
 
-def require_permissions(required_permissions: List[Permission]):
+def get_user_with_required_permissions(required_permissions: List[Permission]):
     """Check if the current user has the required permissions."""
 
     def get_current_active_user_permissions(
@@ -146,11 +145,8 @@ def require_permissions(required_permissions: List[Permission]):
     return get_current_active_user_permissions
 
 
-def PermissionChecker(required_permissions: List[Permission] | Role):
+def PermissionChecker(required_permissions: List[Permission]):
     """Check if the current user has the required permissions."""
-
-    if isinstance(required_permissions, Role):
-        required_permissions = ROLE_PERMISSIONs[required_permissions].permissions
 
     async def check_permission(
         current_user: Annotated[User, Depends(get_current_active_user)],

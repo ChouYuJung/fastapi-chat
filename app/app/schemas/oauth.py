@@ -29,7 +29,7 @@ class Permission(str, Enum):
 class RolePermission(BaseModel):
     name: Text
     permissions: List[Permission]
-    authority_Level: int = Field(
+    authority_level: int = Field(
         default=0, description="The authority level of the role", ge=0, le=100
     )
 
@@ -42,7 +42,7 @@ class RolePermissionSuperAdmin(RolePermission):
         default_factory=lambda: [Permission.MANAGE_ALL_RESOURCES],
         description="Super Admin has all permissions",
     )
-    authority_Level: Literal[100] = Field(default=100)
+    authority_level: Literal[100] = Field(default=100)
 
 
 class RolePermissionPlatformAdmin(RolePermission):
@@ -53,17 +53,19 @@ class RolePermissionPlatformAdmin(RolePermission):
         Literal[
             Permission.MANAGE_PLATFORM,
             Permission.MANAGE_ORGANIZATIONS,
+            Permission.MANAGE_ORG_CONTENT,
             Permission.MANAGE_ORG_USERS,
         ]
     ] = Field(
         default_factory=lambda: [
             Permission.MANAGE_PLATFORM,
             Permission.MANAGE_ORGANIZATIONS,
+            Permission.MANAGE_ORG_CONTENT,
             Permission.MANAGE_ORG_USERS,
         ],
         description="Platform Admin has platform-wide permissions",
     )
-    authority_Level: Literal[3] = Field(default=3)
+    authority_level: Literal[3] = Field(default=3)
 
 
 class RolePermissionOrgAdmin(RolePermission):
@@ -84,7 +86,7 @@ class RolePermissionOrgAdmin(RolePermission):
         ],
         description="Organization Admin has organization-wide permissions",
     )
-    authority_Level: Literal[2] = Field(default=2)
+    authority_level: Literal[2] = Field(default=2)
 
 
 class RolePermissionOrgUser(RolePermission):
@@ -95,7 +97,7 @@ class RolePermissionOrgUser(RolePermission):
         default_factory=lambda: [Permission.USE_ORG_CONTENT],
         description="Organization could use organization content",
     )
-    authority_Level: Literal[1] = Field(default=1)
+    authority_level: Literal[1] = Field(default=1)
 
 
 class RolePermissionOrgGuest(RolePermission):
@@ -106,7 +108,7 @@ class RolePermissionOrgGuest(RolePermission):
         default_factory=lambda: [Permission.USE_ORG_CONTENT],
         description="Organization Guest could use organization content",
     )
-    authority_Level: Literal[0] = Field(default=0)
+    authority_level: Literal[0] = Field(default=0)
 
 
 _ROLE_PERMISSIONs: Dict[Role, RolePermission] = {
@@ -121,8 +123,43 @@ ROLE_PERMISSIONs = MappingProxyType(_ROLE_PERMISSIONs)
 class Organization(BaseModel):
     id: Text = Field(..., description="Organization ID in UUID Version 7 format")
     name: Text = Field(..., description="Organization name")
+    description: Optional[Text] = Field(default=None)
     owner_id: Text = Field(..., description="The initial admin user's ID")
     disabled: bool = Field(default=False)
+
+
+class OrganizationCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    name: Text = Field(..., description="Organization name")
+    description: Optional[Text] = Field(default=None)
+    disabled: bool = Field(default=False)
+
+    def to_organization(
+        self, *, organization_id: Optional[Text] = None, owner_id: Text
+    ) -> Organization:
+        return Organization.model_validate(
+            {
+                "id": organization_id or str(uuid.uuid7()),
+                "name": self.name,
+                "description": self.description,
+                "owner_id": owner_id,
+                "disabled": self.disabled,
+            }
+        )
+
+
+class OrganizationUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    name: Optional[Text] = Field(default=None, description="Organization name")
+    description: Optional[Text] = Field(default=None)
+    disabled: Optional[bool] = Field(default=None)
+
+    def apply_organization(self, organization: Organization) -> Organization:
+        organization_data = organization.model_dump()
+        organization_data.update(
+            self.model_dump(exclude_none=True, exclude={"id", "owner_id"})
+        )
+        return Organization.model_validate(organization_data)
 
 
 class User(BaseModel):
