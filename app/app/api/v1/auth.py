@@ -4,25 +4,19 @@ from typing import Annotated, Text, Tuple
 from app.config import logger, settings
 from app.db._base import DatabaseBase
 from app.db.tokens import caching_token, invalidate_token, retrieve_cached_token
-from app.db.users import create_user
 from app.deps.db import depend_db
 from app.deps.oauth import (
     get_current_active_token_payload,
+    get_current_active_token_payload_data,
     get_current_active_user,
     get_current_token_payload,
     get_current_user,
     get_token_payload,
 )
-from app.schemas.oauth import (
-    PayloadParam,
-    RefreshTokenRequest,
-    Token,
-    UserGuestRegister,
-)
+from app.schemas.oauth import PayloadParam, RefreshTokenRequest, Token
 from app.utils.oauth import (
     authenticate_user,
     create_token_model,
-    get_password_hash,
     is_token_expired,
     validate_client,
 )
@@ -138,17 +132,17 @@ async def api_refresh_token(
         raise HTTPException(status_code=401, detail="Invalid client credentials")
 
     # Validate the user from refresh token and payload
-    user = await get_current_active_user(
-        await get_current_user(
-            await get_current_active_token_payload(
-                await get_current_token_payload(
-                    await get_token_payload(form_data.refresh_token)
-                ),
-                db=db,
-            ),
-            db=db,
-        )
+    token_payload = await get_current_active_token_payload(
+        await get_current_token_payload(
+            await get_token_payload(form_data.refresh_token)
+        ),
+        db=db,
     )
+    token_payload_data = await get_current_active_token_payload_data(token_payload)
+    token_payload_data_user = await get_current_active_user(
+        await get_current_user(token_payload_data, db=db)
+    )
+    user = token_payload_data_user[3]
 
     # Create a new access token for the user
     token = create_token_model(
