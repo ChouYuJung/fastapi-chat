@@ -37,7 +37,7 @@ def create_app():
 
     from .api._router import router as api_router
 
-    app.include_router(api_router, prefix="/api")
+    app.include_router(api_router)
 
     # Set app state
     from app.db._base import DatabaseBase
