@@ -219,9 +219,9 @@ class UserCreate(BaseModel):
         *,
         user_id: Optional[Text] = None,
         organization_id: Optional[Text] = None,
-        allow_organization_empty: bool = False,
+        allow_org_empty: bool = False,
     ) -> User:
-        if not allow_organization_empty and not organization_id:
+        if not allow_org_empty and not organization_id:
             raise ValueError("Organization ID is required")
         return User.model_validate(
             {

@@ -6,6 +6,7 @@ from app.schemas.oauth import (
     Organization,
     OrganizationCreate,
     OrganizationUpdate,
+    Role,
     Token,
     TokenBlacklisted,
     TokenInDB,
@@ -160,8 +161,8 @@ class DatabaseMemory(DatabaseBase):
         self,
         *,
         organization_id: Optional[Text] = None,
-        role: Optional[Text] = None,
-        roles: Optional[Sequence[Text]] = None,
+        role: Optional["Role"] = None,
+        roles: Optional[Sequence["Role"]] = None,
         disabled: Optional[bool] = None,
         sort: Literal["asc", "desc", 1, -1] = "asc",
         start: Optional[Text] = None,
@@ -228,17 +229,38 @@ class DatabaseMemory(DatabaseBase):
         user_create: "UserCreate",
         hashed_password: Text,
         organization_id: Optional[Text] = None,
-        allow_organization_empty: bool = False,
+        allow_org_empty: bool = False,
     ) -> Optional["UserInDB"]:
         user = user_create.to_user(
             organization_id=organization_id,
-            allow_organization_empty=allow_organization_empty,
+            allow_org_empty=allow_org_empty,
         )
         if self.retrieve_user_by_username(user.username):
             return None
         user_db = user.to_db_model(hashed_password=hashed_password)
         self._db["users"].append(user_db)
         return user_db
+
+    def delete_user(
+        self,
+        user_id: Text,
+        *,
+        organization_id: Optional[Text] = None,
+        soft_delete: bool = True,
+    ) -> bool:
+        out = True
+        user = self.retrieve_user(organization_id=organization_id, user_id=user_id)
+        if user is None:
+            return False
+        if soft_delete:
+            for i, u in enumerate(self._db["users"]):
+                if u.id == user_id:
+                    self._db["users"][i].disabled = True
+                    break
+        else:
+            self._db["users"] = [u for u in self._db["users"] if u.id != user_id]
+            user.disabled
+        return out
 
     def retrieve_cached_token(self, username: Text) -> Optional["TokenInDB"]:
         for token in self._db["cached_tokens"]:

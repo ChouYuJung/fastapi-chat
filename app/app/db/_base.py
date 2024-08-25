@@ -7,6 +7,7 @@ if TYPE_CHECKING:
         Organization,
         OrganizationCreate,
         OrganizationUpdate,
+        Role,
         Token,
         TokenInDB,
         UserCreate,
@@ -98,8 +99,8 @@ class DatabaseBase:
         self,
         *,
         organization_id: Optional[Text] = None,
-        role: Optional[Text] = None,
-        roles: Optional[Sequence[Text]] = None,
+        role: Optional["Role"] = None,
+        roles: Optional[Sequence["Role"]] = None,
         disabled: Optional[bool] = None,
         sort: Literal["asc", "desc", 1, -1] = "asc",
         start: Optional[Text] = None,
@@ -123,8 +124,17 @@ class DatabaseBase:
         user_create: "UserCreate",
         hashed_password: Text,
         organization_id: Optional[Text] = None,
-        allow_organization_empty: bool = False,
+        allow_org_empty: bool = False,
     ) -> Optional["UserInDB"]:
+        raise NotImplementedError
+
+    def delete_user(
+        self,
+        user_id: Text,
+        *,
+        organization_id: Optional[Text] = None,
+        soft_delete: bool = True,
+    ) -> bool:
         raise NotImplementedError
 
     def retrieve_cached_token(self, username: Text) -> Optional["TokenInDB"]:

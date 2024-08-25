@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Literal, Optional, Sequence, Text
 
-from app.schemas.oauth import UserCreate, UserInDB, UserUpdate
+from app.schemas.oauth import Role, UserCreate, UserInDB, UserUpdate
 from app.schemas.pagination import Pagination
 
 if TYPE_CHECKING:
@@ -21,8 +21,8 @@ def list_users(
     db: "DatabaseBase",
     *,
     organization_id: Optional[Text] = None,
-    role: Optional[Text] = None,
-    roles: Optional[Sequence[Text]] = None,
+    role: Optional[Role] = None,
+    roles: Optional[Sequence[Role]] = None,
     disabled: Optional[bool] = None,
     sort: Literal["asc", "desc", 1, -1] = "asc",
     start: Optional[Text] = None,
@@ -63,7 +63,7 @@ def create_user(
     user_create: "UserCreate",
     hashed_password: Text,
     organization_id: Optional[Text] = None,
-    allow_organization_empty: bool = False,
+    allow_org_empty: bool = False,
 ) -> Optional["UserInDB"]:
     """Create a new user in the database."""
 
@@ -71,5 +71,19 @@ def create_user(
         user_create=user_create,
         hashed_password=hashed_password,
         organization_id=organization_id,
-        allow_organization_empty=allow_organization_empty,
+        allow_org_empty=allow_org_empty,
+    )
+
+
+def delete_user(
+    db: "DatabaseBase",
+    user_id: Text,
+    *,
+    organization_id: Optional[Text] = None,
+    soft_delete: bool = True,
+) -> bool:
+    """Delete a user from the database."""
+
+    return db.delete_user(
+        user_id=user_id, organization_id=organization_id, soft_delete=soft_delete
     )

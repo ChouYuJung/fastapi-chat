@@ -4,7 +4,13 @@ from typing import Literal, Optional, Text
 from app.config import settings
 from app.db._base import DatabaseBase
 from app.db.tokens import caching_token
-from app.db.users import create_user, get_user_by_id, list_users, update_user
+from app.db.users import (
+    create_user,
+    delete_user,
+    get_user_by_id,
+    list_users,
+    update_user,
+)
 from app.deps.db import depend_db
 from app.deps.oauth import (
     TYPE_TOKEN_PAYLOAD_DATA_USER_ORG,
@@ -23,7 +29,7 @@ from app.schemas.pagination import Pagination
 from app.utils.oauth import create_token_model, get_password_hash
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi import Path as QueryPath
-from fastapi import Query, status
+from fastapi import Query, Response, status
 
 router = APIRouter()
 
@@ -88,7 +94,7 @@ async def api_register(
         user_create=user_guest_register,
         hashed_password=get_password_hash(user_guest_register.password),
         organization_id=org_id,
-        allow_organization_empty=False,
+        allow_org_empty=False,
     )
     if created_user is None:
         raise HTTPException(
@@ -172,7 +178,7 @@ async def api_create_user(
         user_create=user_create,
         hashed_password=get_password_hash(user_create.password),
         organization_id=org_id,
-        allow_organization_empty=False,
+        allow_org_empty=False,
     )
     if created_user is None:
         raise HTTPException(
@@ -224,3 +230,31 @@ async def api_update_user(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
     return user
+
+
+@router.delete(
+    "/organizations/{org_id}/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def api_delete_user(
+    user_id: Text,
+    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
+        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_USERS])
+    ),
+    db: DatabaseBase = Depends(depend_db),
+):
+    """Delete a user."""
+
+    org_id = token_payload_data_user_org[4]
+    assert token_payload_data_user_org[3]
+
+    user = delete_user(
+        db,
+        user_id=user_id,
+        organization_id=org_id,
+        soft_delete=True,
+    )
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
