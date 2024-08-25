@@ -201,9 +201,14 @@ class DatabaseMemory(DatabaseBase):
         return updated_user_db
 
     def create_user(
-        self, *, user_create: "UserCreate", hashed_password: Text
+        self,
+        *,
+        user_create: "UserCreate",
+        hashed_password: Text,
+        organization_id: Optional[Text] = None,
+        allow_organization_empty: bool = False,
     ) -> Optional["UserInDB"]:
-        user = user_create.to_user()
+        user = user_create.to_user(allow_organization_empty=allow_organization_empty)
         if self.retrieve_user_by_username(user.username):
             return None
         user_db = user.to_db_model(hashed_password=hashed_password)

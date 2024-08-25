@@ -40,8 +40,18 @@ def update_user(
 
 
 def create_user(
-    db: "DatabaseBase", *, user_create: "UserCreate", hashed_password: Text
+    db: "DatabaseBase",
+    *,
+    user_create: "UserCreate",
+    hashed_password: Text,
+    organization_id: Optional[Text] = None,
+    allow_organization_empty: bool = False,
 ) -> Optional["UserInDB"]:
     """Create a new user in the database."""
 
-    return db.create_user(user_create=user_create, hashed_password=hashed_password)
+    return db.create_user(
+        user_create=user_create,
+        hashed_password=hashed_password,
+        organization_id=organization_id,
+        allow_organization_empty=allow_organization_empty,
+    )

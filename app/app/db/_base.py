@@ -107,7 +107,12 @@ class DatabaseBase:
         raise NotImplementedError
 
     def create_user(
-        self, *, user_create: "UserCreate", hashed_password: Text
+        self,
+        *,
+        user_create: "UserCreate",
+        hashed_password: Text,
+        organization_id: Optional[Text] = None,
+        allow_organization_empty: bool = False,
     ) -> Optional["UserInDB"]:
         raise NotImplementedError
 
