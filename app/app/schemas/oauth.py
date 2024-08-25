@@ -55,6 +55,8 @@ class RolePermissionPlatformAdmin(RolePermission):
             Permission.MANAGE_ORGANIZATIONS,
             Permission.MANAGE_ORG_CONTENT,
             Permission.MANAGE_ORG_USERS,
+            Permission.MANAGE_ORG_USERS,
+            Permission.USE_ORG_CONTENT,
         ]
     ] = Field(
         default_factory=lambda: [
@@ -62,6 +64,8 @@ class RolePermissionPlatformAdmin(RolePermission):
             Permission.MANAGE_ORGANIZATIONS,
             Permission.MANAGE_ORG_CONTENT,
             Permission.MANAGE_ORG_USERS,
+            Permission.MANAGE_ORG_USERS,
+            Permission.USE_ORG_CONTENT,
         ],
         description="Platform Admin has platform-wide permissions",
     )

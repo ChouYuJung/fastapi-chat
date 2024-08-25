@@ -12,6 +12,7 @@ from app.deps.oauth import (
 )
 from app.schemas.oauth import (
     ROLE_PERMISSIONS,
+    Permission,
     Token,
     User,
     UserCreate,
@@ -30,7 +31,7 @@ router = APIRouter()
 @router.get("/organizations/{org_id}/users/me")
 async def read_users_me(
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions
+        get_user_of_org_with_required_permissions([Permission.USE_ORG_CONTENT])
     ),
 ) -> User:
     """Retrieve the current user."""
@@ -56,7 +57,7 @@ async def api_register(
         },
     ),
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions
+        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_USERS])
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> Token:
@@ -112,7 +113,7 @@ async def api_list_users(
     before: Optional[Text] = Query(None),
     limit: Optional[int] = Query(10, ge=1, le=100),
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions
+        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_USERS])
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> Pagination[User]:
@@ -144,7 +145,7 @@ async def api_create_user(
         },
     ),
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions
+        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_USERS])
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:
@@ -171,7 +172,7 @@ async def api_create_user(
 async def api_retrieve_user(
     user_id: Text = QueryPath(..., min_length=4, max_length=64),
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions
+        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_USERS])
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:
@@ -192,7 +193,7 @@ async def api_update_user(
     user_id: Text,
     user_update: UserUpdate = Body(...),
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions
+        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_USERS])
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:

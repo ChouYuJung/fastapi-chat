@@ -31,8 +31,9 @@ class DatabaseMemory(DatabaseBase):
                 "id": "01917074-e006-7df3-b00b-d5daa3631291",
                 "username": "admin",
                 "full_name": "Admin User",
+                "organization_id": None,
                 "email": "admin@example.com",
-                "role": "admin",
+                "role": "super_admin",
                 "hashed_password": "$2b$12$vju9EMyn.CE80h88pErZNuSC.0EZOH/rqw2RpCLdCeEVLRPfhDlYS",  # 'pass1234'
                 "disabled": False,
             },  # noqa: E501

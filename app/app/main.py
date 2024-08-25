@@ -2,8 +2,8 @@ import json
 from typing import Any, Text
 
 from app.config import logger, settings
-from app.deps.oauth import RoleChecker
-from app.schemas.oauth import Role
+from app.deps.oauth import PermissionChecker
+from app.schemas.oauth import Permission
 from app.utils.common import is_json_serializable
 from fastapi import Depends, FastAPI, Request
 
@@ -21,7 +21,7 @@ def create_app():
 
     @app.get(
         "/echo",
-        dependencies=[Depends(RoleChecker([Role.ADMIN]))],
+        dependencies=[Depends(PermissionChecker([Permission.MANAGE_ALL_RESOURCES]))],
     )
     async def echo(request: Request):
         body = await request.body()
