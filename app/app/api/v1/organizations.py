@@ -25,7 +25,7 @@ from fastapi import Query, Response, status
 router = APIRouter()
 
 
-async def _retrieve_organization_with_user_permission(
+async def _can_user_manage_the_org(
     db: "DatabaseBase", *, org_id: Text, user: "User"
 ) -> "Organization":
     """Retrieve an organization by its ID with user permission checking."""
@@ -100,9 +100,7 @@ async def api_retrieve_organization(
 ) -> Organization:
     """Retrieve an organization by its ID."""
 
-    org = await _retrieve_organization_with_user_permission(
-        db, org_id=org_id, user=current_user
-    )
+    org = await _can_user_manage_the_org(db, org_id=org_id, user=current_user)
     return org
 
 
@@ -117,9 +115,7 @@ async def api_update_organization(
 ) -> Organization:
     """Update an organization by its ID."""
 
-    org = await _retrieve_organization_with_user_permission(
-        db, org_id=org_id, user=current_user
-    )
+    org = await _can_user_manage_the_org(db, org_id=org_id, user=current_user)
 
     org = await update_organization(
         db, organization_id=org_id, organization_update=organization_update
@@ -142,9 +138,7 @@ async def api_delete_organization(
 ):
     """Delete an organization by its ID."""
 
-    await _retrieve_organization_with_user_permission(
-        db, org_id=org_id, user=current_user
-    )
+    await _can_user_manage_the_org(db, org_id=org_id, user=current_user)
 
     await delete_organization(db, organization_id=org_id, soft_delete=True)
 

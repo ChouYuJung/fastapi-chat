@@ -110,7 +110,11 @@ async def api_login(
 
     # Create an access token for the authenticated user.
     token = create_token_model(
-        data={"sub": user.username, "role": user.role},
+        data={
+            "sub": user.username,
+            "role": user.role,
+            "organization_id": user.organization_id,
+        },
         access_token_expires_delta=timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         ),

@@ -9,13 +9,17 @@ from app.deps.db import depend_db
 from app.schemas.oauth import (
     PayloadParam,
     Permission,
+    Role,
     ROLE_PERMISSIONs,
     TokenData,
     User,
     UserInDB,
 )
 from app.utils.oauth import oauth2_scheme, verify_payload, verify_token
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException
+from fastapi import Path as QueryPath
+from fastapi import status
+from pydantic_core import ValidationError
 
 
 async def get_token_payload(
@@ -72,12 +76,11 @@ async def get_current_active_token_payload(
     return token_payload
 
 
-async def get_current_user(
+async def get_current_active_token_payload_data(
     token_payload: Annotated[
         Tuple[Text, PayloadParam], Depends(get_current_active_token_payload)
     ],
-    db: Annotated[DatabaseBase, Depends(depend_db)],
-) -> UserInDB:
+) -> Tuple[Text, PayloadParam, TokenData]:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -86,11 +89,33 @@ async def get_current_user(
 
     # Parse token data
     payload = token_payload[1]
-    username = payload.get("sub")
-    token_data = TokenData(username=username)
-    if token_data.username is None:
-        logger.debug(f"Token '{token_payload[0]}' has an invalid username")
+    try:
+        token_data = TokenData.from_payload(payload=dict(payload))
+    except ValidationError as e:
+        logger.exception(e)
+        logger.error(f"Token '{token_payload[0]}' has invalid payload: {payload}")
         raise credentials_exception
+    if token_data.username is None:
+        logger.error(f"Token '{token_payload[0]}' has an invalid username")
+        raise credentials_exception
+
+    return (token_payload[0], token_payload[1], token_data)
+
+
+async def get_current_user(
+    token_payload_data: Annotated[
+        Tuple[Text, PayloadParam, TokenData],
+        Depends(get_current_active_token_payload_data),
+    ],
+    db: Annotated[DatabaseBase, Depends(depend_db)],
+) -> Tuple[Text, PayloadParam, TokenData, UserInDB]:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    token_data = token_payload_data[2]
 
     # Get user from the database
     user = get_user(db, username=token_data.username)
@@ -99,34 +124,64 @@ async def get_current_user(
         raise credentials_exception
 
     # Return the user
-    return user
+    return (token_payload_data[0], token_payload_data[1], token_payload_data[2], user)
 
 
 async def get_current_active_user(
-    current_user: Annotated[User, Depends(get_current_user)]
+    token_payload_data_user: Annotated[
+        Tuple[Text, PayloadParam, TokenData, UserInDB], Depends(get_current_user)
+    ]
 ):
+    current_user = token_payload_data_user[3]
     if current_user.disabled:
         logger.debug(f"User '{current_user.username}' is inactive")
         raise HTTPException(status_code=400, detail="Inactive user")
-    return current_user
+    return token_payload_data_user
+
+
+async def get_current_active_user_of_org(
+    org_id: Text = QueryPath(
+        ..., description="The ID of the organization to retrieve."
+    ),
+    token_payload_data_user: Tuple[Text, PayloadParam, TokenData, UserInDB] = Depends(
+        get_current_active_user
+    ),
+):
+    user = token_payload_data_user[3]
+
+    if user.role in (Role.SUPER_ADMIN, Role.PLATFORM_ADMIN):
+        pass
+
+    elif user.organization_id != org_id:
+        logger.debug(
+            f"User '{user.username}' is not a member of organization '{org_id}'"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
+
+    return token_payload_data_user
 
 
 def get_user_with_required_permissions(required_permissions: List[Permission]):
     """Check if the current user has the required permissions."""
 
     def get_current_active_user_permissions(
-        current_user: User = Depends(get_current_active_user),
+        token_payload_data_user: Tuple[
+            Text, PayloadParam, TokenData, UserInDB
+        ] = Depends(get_current_active_user),
         # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
-    ) -> User:
-        user_permissions = ROLE_PERMISSIONs[current_user.role].permissions
+    ) -> Tuple[Text, PayloadParam, TokenData, UserInDB]:
+        user = token_payload_data_user[3]
+        user_permissions = ROLE_PERMISSIONs[user.role].permissions
         logger.debug(
-            f"User '{current_user.username}' with role '{current_user.role}' "
+            f"User '{user.username}' with role '{user.role}' "
             + f"has permissions '{user_permissions}'"
         )
 
         # Check if the user has the required permissions
         if Permission.MANAGE_ALL_RESOURCES in user_permissions:
-            return current_user  # Super Admin has all permissions
+            return token_payload_data_user  # Super Admin has all permissions
 
         if not set(required_permissions).issubset(set(user_permissions)):
             raise HTTPException(
@@ -140,9 +195,46 @@ def get_user_with_required_permissions(required_permissions: List[Permission]):
         ):
             pass
 
-        return current_user
+        return token_payload_data_user
 
     return get_current_active_user_permissions
+
+
+def get_user_of_org_with_required_permissions(required_permissions: List[Permission]):
+    """Check if the current user has the required permissions."""
+
+    def get_current_active_user_of_org_permissions(
+        token_payload_data_user: Tuple[
+            Text, PayloadParam, TokenData, UserInDB
+        ] = Depends(get_current_active_user_of_org),
+        # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
+    ) -> Tuple[Text, PayloadParam, TokenData, UserInDB]:
+        user = token_payload_data_user[3]
+        user_permissions = ROLE_PERMISSIONs[user.role].permissions
+        logger.debug(
+            f"User '{user.username}' with role '{user.role}' "
+            + f"has permissions '{user_permissions}'"
+        )
+
+        # Check if the user has the required permissions
+        if Permission.MANAGE_ALL_RESOURCES in user_permissions:
+            return token_payload_data_user  # Super Admin has all permissions
+
+        if not set(required_permissions).issubset(set(user_permissions)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+            )
+
+        # Additional checks for organization-specific permissions
+        if (
+            Permission.MANAGE_ORG_CONTENT in required_permissions
+            or Permission.MANAGE_ORG_USERS in required_permissions
+        ):
+            pass
+
+        return token_payload_data_user
+
+    return get_current_active_user_of_org_permissions
 
 
 def PermissionChecker(required_permissions: List[Permission]):

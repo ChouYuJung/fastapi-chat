@@ -214,8 +214,11 @@ class UserCreate(BaseModel):
         *,
         user_id: Optional[Text] = None,
         organization_id: Optional[Text] = None,
-        disabled: bool = False
+        disabled: bool = False,
+        allow_organization_empty: bool = False,
     ) -> User:
+        if not allow_organization_empty and not organization_id:
+            raise ValueError("Organization ID is required")
         return User.model_validate(
             {
                 "id": user_id or str(uuid.uuid7()),
@@ -289,7 +292,11 @@ class RefreshTokenRequest(BaseModel):
 
 class TokenData(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
-    username: Optional[Text] = None
+    username: Text
+
+    @classmethod
+    def from_payload(cls, payload: Dict) -> "TokenData":
+        return TokenData.model_validate({"username": payload.get("sub")})
 
 
 class PayloadParam(TypedDict, total=False):
