@@ -77,9 +77,15 @@ async def api_create_organization(
 ) -> Organization:
     """Create a new organization."""
 
-    return await create_organization(
+    org = await create_organization(
         db, organization_create=organization_create, owner_id=current_user.id
     )
+    if org is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Organization already exists"
+        )
+
+    return org
 
 
 @router.get("/organizations/{org_id}")
@@ -118,6 +124,10 @@ async def api_update_organization(
     org = await update_organization(
         db, organization_id=org_id, organization_update=organization_update
     )
+    if org is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+        )
 
     return org
 

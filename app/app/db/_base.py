@@ -3,7 +3,16 @@ from typing import TYPE_CHECKING, Literal, Optional, Text
 from yarl import URL
 
 if TYPE_CHECKING:
-    from app.schemas.oauth import Token, TokenInDB, UserCreate, UserInDB, UserUpdate
+    from app.schemas.oauth import (
+        Organization,
+        OrganizationCreate,
+        OrganizationUpdate,
+        Token,
+        TokenInDB,
+        UserCreate,
+        UserInDB,
+        UserUpdate,
+    )
     from app.schemas.pagination import Pagination
 
 
@@ -46,6 +55,34 @@ class DatabaseBase:
 
     def touch(self):
         pass
+
+    def list_organizations(
+        self,
+        disabled: Optional[bool] = False,
+        sort: Literal["asc", "desc"] = "asc",
+        start: Optional[Text] = None,
+        before: Optional[Text] = None,
+        limit: Optional[int] = 10,
+    ) -> "Pagination[Organization]":
+        raise NotImplementedError
+
+    def retrieve_organization(self, organization_id: Text) -> Optional["Organization"]:
+        raise NotImplementedError
+
+    def create_organization(
+        self, *, organization_create: "OrganizationCreate", owner_id: Text
+    ) -> Optional["Organization"]:
+        raise NotImplementedError
+
+    def update_organization(
+        self, *, organization_id: Text, organization_update: "OrganizationUpdate"
+    ) -> Optional["Organization"]:
+        raise NotImplementedError
+
+    def delete_organization(
+        self, *, organization_id: Text, soft_delete: bool = True
+    ) -> Optional["Organization"]:
+        raise NotImplementedError
 
     def retrieve_user(self, user_id: Text) -> Optional["UserInDB"]:
         raise NotImplementedError

@@ -3,6 +3,9 @@ from typing import List, Literal, Optional, Text, TypedDict
 
 from app.db._base import DatabaseBase
 from app.schemas.oauth import (
+    Organization,
+    OrganizationCreate,
+    OrganizationUpdate,
     Token,
     TokenBlacklisted,
     TokenInDB,
@@ -14,6 +17,7 @@ from app.schemas.pagination import Pagination
 
 
 class _BD(TypedDict):
+    organizations: List["Organization"]
     users: List["UserInDB"]
     cached_tokens: List["TokenInDB"]
     blacklisted_tokens: List["TokenBlacklisted"]
@@ -21,7 +25,7 @@ class _BD(TypedDict):
 
 class DatabaseMemory(DatabaseBase):
 
-    fake_users_data_init = MappingProxyType(
+    fake_super_admin_init = MappingProxyType(
         {
             "admin": {
                 "id": "01917074-e006-7df3-b00b-d5daa3631291",
@@ -32,33 +36,16 @@ class DatabaseMemory(DatabaseBase):
                 "hashed_password": "$2b$12$vju9EMyn.CE80h88pErZNuSC.0EZOH/rqw2RpCLdCeEVLRPfhDlYS",  # 'pass1234'
                 "disabled": False,
             },  # noqa: E501
-            "team": {
-                "id": "0191740f-261f-77d2-9342-43d1e9f33e15",
-                "username": "team",
-                "full_name": "Team User",
-                "email": "team@example.com",
-                "role": "editor",
-                "hashed_password": "$2b$12$vju9EMyn.CE80h88pErZNuSC.0EZOH/rqw2RpCLdCeEVLRPfhDlYS",  # 'pass1234'
-                "disabled": False,
-            },  # noqa: E501
-            "guest": {
-                "id": "0191740f-f0a1-7b32-812a-45e20f12ed6b",
-                "username": "guest",
-                "full_name": "Guest User",
-                "email": "guest@example.com",
-                "role": "viewer",
-                "hashed_password": "$2b$12$vju9EMyn.CE80h88pErZNuSC.0EZOH/rqw2RpCLdCeEVLRPfhDlYS",  # 'pass1234',
-                "disabled": False,
-            },  # noqa: E501
         }
     )
 
     def __init__(self, *arg, **kwargs):
         self._url = None
         self._db = _BD(
+            organizations=[],
             users=[
                 UserInDB.model_validate(u)
-                for u in dict(self.fake_users_data_init).values()
+                for u in dict(self.fake_super_admin_init).values()
             ],
             cached_tokens=[],
             blacklisted_tokens=[],
@@ -67,6 +54,86 @@ class DatabaseMemory(DatabaseBase):
     @property
     def client(self) -> _BD:
         return self._db
+
+    def list_organizations(
+        self,
+        disabled: Optional[bool] = False,
+        sort: Literal["asc", "desc"] = "asc",
+        start: Optional[Text] = None,
+        before: Optional[Text] = None,
+        limit: Optional[int] = 10,
+    ) -> "Pagination[Organization]":
+        limit = min(limit or 1000, 1000)
+        organizations = self._db["organizations"]
+        if disabled is not None:
+            organizations = [org for org in organizations if org.disabled == disabled]
+        if sort in ("asc", 1):
+            organizations = sorted(organizations, key=lambda org: org.id)
+        else:
+            organizations = sorted(organizations, key=lambda org: org.id, reverse=True)
+        if start:
+            organizations = [
+                org
+                for org in organizations
+                if (org.id >= start if sort in ("asc", 1) else org.id <= start)
+            ]
+        if before:
+            organizations = [
+                org
+                for org in organizations
+                if (org.id < before if sort in ("asc", 1) else org.id > before)
+            ]
+        return Pagination[Organization].model_validate(
+            {
+                "object": "list",
+                "data": organizations[:limit],
+                "first_id": organizations[0].id if organizations else None,
+                "last_id": organizations[-1].id if organizations else None,
+                "has_more": len(organizations) > limit,
+            }
+        )
+
+    def retrieve_organization(self, organization_id: Text) -> Optional["Organization"]:
+        for org in self._db["organizations"]:
+            if org.id == organization_id:
+                return org
+        return None
+
+    def create_organization(
+        self, *, organization_create: "OrganizationCreate", owner_id: Text
+    ) -> Optional["Organization"]:
+        org = organization_create.to_organization(owner_id=owner_id)
+        self._db["organizations"].append(org)
+        return org
+
+    def update_organization(
+        self, *, organization_id: Text, organization_update: "OrganizationUpdate"
+    ) -> Optional["Organization"]:
+        org = self.retrieve_organization(organization_id)
+        if org is None:
+            return None
+        updated_org = organization_update.apply_organization(org)
+        for i, o in enumerate(self._db["organizations"]):
+            if o.id == organization_id:
+                self._db["organizations"][i] = updated_org
+                break
+        return updated_org
+
+    def delete_organization(
+        self, *, organization_id: Text, soft_delete: bool = True
+    ) -> Optional["Organization"]:
+        org = self.retrieve_organization(organization_id)
+        if org is None:
+            return None
+
+        if soft_delete:
+            org.disabled = True
+            return org
+        else:
+            self._db["organizations"] = [
+                o for o in self._db["organizations"] if o.id != organization_id
+            ]
+            return org
 
     def retrieve_user(self, user_id: Text) -> Optional["UserInDB"]:
         for user in self._db["users"]:
