@@ -136,14 +136,22 @@ class DatabaseMemory(DatabaseBase):
             ]
             return org
 
-    def retrieve_user(self, user_id: Text) -> Optional["UserInDB"]:
+    def retrieve_user(
+        self, user_id: Text, *, organization_id: Optional[Text] = None
+    ) -> Optional["UserInDB"]:
         for user in self._db["users"]:
+            if organization_id is not None and user.organization_id != organization_id:
+                continue
             if user.id == user_id:
                 return user
         return None
 
-    def retrieve_user_by_username(self, username: Text) -> Optional["UserInDB"]:
+    def retrieve_user_by_username(
+        self, username: Text, organization_id: Optional[Text] = None
+    ) -> Optional["UserInDB"]:
         for user in self._db["users"]:
+            if organization_id is not None and user.organization_id != organization_id:
+                continue
             if user.username == username:
                 return user
         return None
@@ -151,6 +159,7 @@ class DatabaseMemory(DatabaseBase):
     def list_users(
         self,
         *,
+        organization_id: Optional[Text] = None,
         disabled: Optional[bool] = None,
         sort: Literal["asc", "desc", 1, -1] = "asc",
         start: Optional[Text] = None,
@@ -159,6 +168,8 @@ class DatabaseMemory(DatabaseBase):
     ) -> Pagination[UserInDB]:
         limit = min(limit or 1000, 1000)
         users = self._db["users"]
+        if organization_id is not None:
+            users = [user for user in users if user.organization_id == organization_id]
         if disabled is not None:
             users = [user for user in users if user.disabled == disabled]
         if sort in ("asc", 1):
@@ -188,9 +199,13 @@ class DatabaseMemory(DatabaseBase):
         )
 
     def update_user(
-        self, *, user_id: Text, user_update: "UserUpdate"
+        self,
+        *,
+        organization_id: Optional[Text] = None,
+        user_id: Text,
+        user_update: "UserUpdate",
     ) -> Optional["UserInDB"]:
-        user = self.retrieve_user(user_id)
+        user = self.retrieve_user(organization_id=organization_id, user_id=user_id)
         if user is None:
             return None
         updated_user = user_update.apply_user(user)
@@ -209,7 +224,10 @@ class DatabaseMemory(DatabaseBase):
         organization_id: Optional[Text] = None,
         allow_organization_empty: bool = False,
     ) -> Optional["UserInDB"]:
-        user = user_create.to_user(allow_organization_empty=allow_organization_empty)
+        user = user_create.to_user(
+            organization_id=organization_id,
+            allow_organization_empty=allow_organization_empty,
+        )
         if self.retrieve_user_by_username(user.username):
             return None
         user_db = user.to_db_model(hashed_password=hashed_password)

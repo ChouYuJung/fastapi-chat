@@ -36,7 +36,13 @@ async def read_users_me(
 ) -> User:
     """Retrieve the current user."""
 
+    org_id = token_payload_data_user_org[4]
     user = token_payload_data_user_org[3]
+    if user.organization_id != org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this organization",
+        )
     return user
 
 
@@ -119,10 +125,17 @@ async def api_list_users(
 ) -> Pagination[User]:
     """Search for users by username or other criteria."""
 
+    org_id = token_payload_data_user_org[4]
     assert token_payload_data_user_org[3]
     return Pagination[User].model_validate(
         list_users(
-            db, disabled=disabled, sort=sort, start=start, before=before, limit=limit
+            db,
+            organization_id=org_id,
+            disabled=disabled,
+            sort=sort,
+            start=start,
+            before=before,
+            limit=limit,
         ).model_dump()
     )
 
@@ -178,9 +191,10 @@ async def api_retrieve_user(
 ) -> User:
     """Retrieve user profile information."""
 
+    org_id = token_payload_data_user_org[4]
     assert token_payload_data_user_org[3]
 
-    user = get_user_by_id(db, user_id=user_id)
+    user = get_user_by_id(db, organization_id=org_id, user_id=user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -199,9 +213,12 @@ async def api_update_user(
 ) -> User:
     """Update user profile information."""
 
+    org_id = token_payload_data_user_org[4]
     assert token_payload_data_user_org[3]
 
-    user = update_user(db, user_id=user_id, user_update=user_update)
+    user = update_user(
+        db, organization_id=org_id, user_id=user_id, user_update=user_update
+    )
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"

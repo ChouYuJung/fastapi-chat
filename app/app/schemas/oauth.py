@@ -212,13 +212,13 @@ class UserCreate(BaseModel):
     password: Text
     full_name: Text
     role: Role = Field(default=Role.ORG_GUEST)
+    disabled: bool = False
 
     def to_user(
         self,
         *,
         user_id: Optional[Text] = None,
         organization_id: Optional[Text] = None,
-        disabled: bool = False,
         allow_organization_empty: bool = False,
     ) -> User:
         if not allow_organization_empty and not organization_id:
@@ -231,7 +231,7 @@ class UserCreate(BaseModel):
                 "full_name": self.full_name,
                 "organization_id": organization_id,
                 "role": self.role,
-                "disabled": disabled,
+                "disabled": self.disabled,
             }
         )
 

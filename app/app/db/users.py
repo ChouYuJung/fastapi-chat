@@ -11,13 +11,16 @@ def get_user(db: "DatabaseBase", *, username: Text) -> Optional["UserInDB"]:
     return db.retrieve_user_by_username(username)
 
 
-def get_user_by_id(db: "DatabaseBase", *, user_id: Text) -> Optional["UserInDB"]:
-    return db.retrieve_user(user_id)
+def get_user_by_id(
+    db: "DatabaseBase", *, user_id: Text, organization_id: Optional[Text] = None
+) -> Optional["UserInDB"]:
+    return db.retrieve_user(organization_id=organization_id, user_id=user_id)
 
 
 def list_users(
     db: "DatabaseBase",
     *,
+    organization_id: Optional[Text] = None,
     disabled: Optional[bool] = None,
     sort: Literal["asc", "desc", 1, -1] = "asc",
     start: Optional[Text] = None,
@@ -27,16 +30,27 @@ def list_users(
     """List users from the database."""
 
     return db.list_users(
-        disabled=disabled, sort=sort, start=start, before=before, limit=limit
+        organization_id=organization_id,
+        disabled=disabled,
+        sort=sort,
+        start=start,
+        before=before,
+        limit=limit,
     )
 
 
 def update_user(
-    db: "DatabaseBase", *, user_id: Text, user_update: "UserUpdate"
+    db: "DatabaseBase",
+    *,
+    organization_id: Optional[Text] = None,
+    user_id: Text,
+    user_update: "UserUpdate",
 ) -> Optional[UserInDB]:
     """Update a user in the database."""
 
-    return db.update_user(user_id=user_id, user_update=user_update)
+    return db.update_user(
+        organization_id=organization_id, user_id=user_id, user_update=user_update
+    )
 
 
 def create_user(

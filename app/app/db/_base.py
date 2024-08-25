@@ -84,15 +84,20 @@ class DatabaseBase:
     ) -> Optional["Organization"]:
         raise NotImplementedError
 
-    def retrieve_user(self, user_id: Text) -> Optional["UserInDB"]:
+    def retrieve_user(
+        self, user_id: Text, *, organization_id: Optional[Text] = None
+    ) -> Optional["UserInDB"]:
         raise NotImplementedError
 
-    def retrieve_user_by_username(self, username: Text) -> Optional["UserInDB"]:
+    def retrieve_user_by_username(
+        self, username: Text, organization_id: Optional[Text] = None
+    ) -> Optional["UserInDB"]:
         raise NotImplementedError
 
     def list_users(
         self,
         *,
+        organization_id: Optional[Text] = None,
         disabled: Optional[bool] = None,
         sort: Literal["asc", "desc", 1, -1] = "asc",
         start: Optional[Text] = None,
@@ -102,7 +107,11 @@ class DatabaseBase:
         raise NotImplementedError
 
     def update_user(
-        self, *, user_id: Text, user_update: "UserUpdate"
+        self,
+        *,
+        organization_id: Optional[Text] = None,
+        user_id: Text,
+        user_update: "UserUpdate",
     ) -> Optional["UserInDB"]:
         raise NotImplementedError
 
