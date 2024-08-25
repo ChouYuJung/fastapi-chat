@@ -2,10 +2,19 @@ import hashlib
 import json
 import time
 from enum import Enum
-from typing import Annotated, List, Literal, Optional, Required, Text, TypedDict
+from types import MappingProxyType
+from typing import Annotated, Dict, List, Literal, Optional, Required, Text, TypedDict
 
 import uuid_utils as uuid
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+
+class Role(str, Enum):
+    SUPER_ADMIN = "super_admin"
+    PLATFORM_ADMIN = "platform_admin"
+    ORG_ADMIN = "org_admin"
+    ORG_USER = "org_user"
+    ORG_GUEST = "org_guest"
 
 
 class Permission(str, Enum):
@@ -17,41 +26,103 @@ class Permission(str, Enum):
     USE_ORG_CONTENT = "use_org_content"
 
 
-class Role(BaseModel):
+class RolePermission(BaseModel):
     name: Text
     permissions: List[Permission]
+    authority_Level: int = Field(
+        default=0, description="The authority level of the role", ge=0, le=100
+    )
 
 
-PREDEFINED_ROLES = {
-    "SUPER_ADMIN": Role(
-        name="Super Admin", permissions=[Permission.MANAGE_ALL_RESOURCES]
-    ),
-    "PLATFORM_ADMIN": Role(
-        name="Platform Admin",
-        permissions=[
+class RolePermissionSuperAdmin(RolePermission):
+    name: Literal[Role.SUPER_ADMIN] = Field(
+        default=Role.SUPER_ADMIN, description="Super Admin"
+    )
+    permissions: List[Literal[Permission.MANAGE_ALL_RESOURCES]] = Field(
+        default_factory=lambda: [Permission.MANAGE_ALL_RESOURCES],
+        description="Super Admin has all permissions",
+    )
+    authority_Level: Literal[100] = Field(default=100)
+
+
+class RolePermissionPlatformAdmin(RolePermission):
+    name: Literal[Role.PLATFORM_ADMIN] = Field(
+        default=Role.PLATFORM_ADMIN, description="Platform Admin"
+    )
+    permissions: List[
+        Literal[
+            Permission.MANAGE_PLATFORM,
+            Permission.MANAGE_ORGANIZATIONS,
+            Permission.MANAGE_ORG_USERS,
+        ]
+    ] = Field(
+        default_factory=lambda: [
             Permission.MANAGE_PLATFORM,
             Permission.MANAGE_ORGANIZATIONS,
             Permission.MANAGE_ORG_USERS,
         ],
-    ),
-    "ORG_ADMIN": Role(
-        name="Organization Admin",
-        permissions=[
+        description="Platform Admin has platform-wide permissions",
+    )
+    authority_Level: Literal[3] = Field(default=3)
+
+
+class RolePermissionOrgAdmin(RolePermission):
+    name: Literal[Role.ORG_ADMIN] = Field(
+        default=Role.ORG_ADMIN, description="Organization Admin"
+    )
+    permissions: List[
+        Literal[
+            Permission.MANAGE_ORG_CONTENT,
+            Permission.MANAGE_ORG_USERS,
+            Permission.USE_ORG_CONTENT,
+        ]
+    ] = Field(
+        default_factory=lambda: [
             Permission.MANAGE_ORG_CONTENT,
             Permission.MANAGE_ORG_USERS,
             Permission.USE_ORG_CONTENT,
         ],
-    ),
-    "ORG_USER": Role(
-        name="Organization User", permissions=[Permission.USE_ORG_CONTENT]
-    ),
+        description="Organization Admin has organization-wide permissions",
+    )
+    authority_Level: Literal[2] = Field(default=2)
+
+
+class RolePermissionOrgUser(RolePermission):
+    name: Literal[Role.ORG_USER] = Field(
+        default=Role.ORG_USER, description="Organization User"
+    )
+    permissions: List[Literal[Permission.USE_ORG_CONTENT]] = Field(
+        default_factory=lambda: [Permission.USE_ORG_CONTENT],
+        description="Organization could use organization content",
+    )
+    authority_Level: Literal[1] = Field(default=1)
+
+
+class RolePermissionOrgGuest(RolePermission):
+    name: Literal[Role.ORG_GUEST] = Field(
+        default=Role.ORG_GUEST, description="Organization Guest"
+    )
+    permissions: List[Literal[Permission.USE_ORG_CONTENT]] = Field(
+        default_factory=lambda: [Permission.USE_ORG_CONTENT],
+        description="Organization Guest could use organization content",
+    )
+    authority_Level: Literal[0] = Field(default=0)
+
+
+_ROLE_PERMISSIONs: Dict[Role, RolePermission] = {
+    Role.SUPER_ADMIN: RolePermissionSuperAdmin(),
+    Role.PLATFORM_ADMIN: RolePermissionPlatformAdmin(),
+    Role.ORG_ADMIN: RolePermissionOrgAdmin(),
+    Role.ORG_USER: RolePermissionOrgUser(),
 }
+ROLE_PERMISSIONs = MappingProxyType(_ROLE_PERMISSIONs)
 
 
 class Organization(BaseModel):
     id: Text = Field(..., description="Organization ID in UUID Version 7 format")
     name: Text = Field(..., description="Organization name")
     owner_id: Text = Field(..., description="The initial admin user's ID")
+    disabled: bool = Field(default=False)
 
 
 class User(BaseModel):
@@ -77,7 +148,7 @@ class UserInDB(User):
 
 
 class UserUpdate(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     email: Optional[EmailStr] = Field(default=None)
     full_name: Optional[Text] = Field(default=None)
     role: Optional[Role] = Field(default=None)
@@ -94,15 +165,19 @@ class UserUpdate(BaseModel):
 
 
 class UserCreate(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     username: Text
     email: EmailStr
     password: Text
     full_name: Text
-    role: Role = Field(default=Role.VIEWER)
+    role: Role = Field(default=Role.ORG_GUEST)
 
     def to_user(
-        self, *, user_id: Optional[Text] = None, disabled: bool = False
+        self,
+        *,
+        user_id: Optional[Text] = None,
+        organization_id: Optional[Text] = None,
+        disabled: bool = False
     ) -> User:
         return User.model_validate(
             {
@@ -110,6 +185,7 @@ class UserCreate(BaseModel):
                 "username": self.username,
                 "email": self.email,
                 "full_name": self.full_name,
+                "organization_id": organization_id,
                 "role": self.role,
                 "disabled": disabled,
             }
@@ -118,7 +194,7 @@ class UserCreate(BaseModel):
 
 class UserGuestRegister(UserCreate):
     model_config = ConfigDict(str_strip_whitespace=True)
-    role: Literal[Role.VIEWER] = Field(default=Role.VIEWER)
+    role: Literal[Role.ORG_GUEST] = Field(default=Role.ORG_GUEST)
 
 
 class Token(BaseModel):

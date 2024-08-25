@@ -6,7 +6,15 @@ from app.db._base import DatabaseBase
 from app.db.tokens import is_token_blocked
 from app.db.users import get_user
 from app.deps.db import depend_db
-from app.schemas.oauth import PayloadParam, Permission, Role, TokenData, User, UserInDB
+from app.schemas.oauth import (
+    PayloadParam,
+    Permission,
+    Role,
+    ROLE_PERMISSIONs,
+    TokenData,
+    User,
+    UserInDB,
+)
 from app.utils.oauth import oauth2_scheme, verify_payload, verify_token
 from fastapi import Depends, HTTPException, status
 
@@ -105,31 +113,23 @@ async def get_current_active_user(
 
 
 def require_permissions(required_permissions: List[Permission]):
+    """Check if the current user has the required permissions."""
+
     def get_current_active_user_permissions(
         current_user: User = Depends(get_current_active_user),
+        # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
     ) -> User:
-        if Permission.MANAGE_ALL_RESOURCES in current_user.role.permissions:
+        user_permissions = ROLE_PERMISSIONs[current_user.role].permissions
+        logger.debug(
+            f"User '{current_user.username}' with role '{current_user.role}' "
+            + f"has permissions '{user_permissions}'"
+        )
+
+        # Check if the user has the required permissions
+        if Permission.MANAGE_ALL_RESOURCES in user_permissions:
             return current_user  # Super Admin has all permissions
 
-        if not set(required_permissions).issubset(set(current_user.role.permissions)):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
-            )
-
-        return current_user
-
-    return get_current_active_user_permissions
-
-
-def PermissionChecker(required_permissions: List[Permission]):
-    async def check_permission(
-        current_user: Annotated[User, Depends(get_current_active_user)],
-        db: DatabaseBase = Depends(depend_db),
-    ):
-        if Permission.MANAGE_ALL_RESOURCES in current_user.role.permissions:
-            return  # Super Admin has all permissions
-
-        if not set(required_permissions).issubset(set(current_user.role.permissions)):
+        if not set(required_permissions).issubset(set(user_permissions)):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
             )
@@ -139,9 +139,43 @@ def PermissionChecker(required_permissions: List[Permission]):
             Permission.MANAGE_ORG_CONTENT in required_permissions
             or Permission.MANAGE_ORG_USERS in required_permissions
         ):
-            # Ensure the user is operating within their own organization
-            # Implement this logic based on your specific requirements
-            # TODO:
+            pass
+
+        return current_user
+
+    return get_current_active_user_permissions
+
+
+def PermissionChecker(required_permissions: List[Permission] | Role):
+    """Check if the current user has the required permissions."""
+
+    if isinstance(required_permissions, Role):
+        required_permissions = ROLE_PERMISSIONs[required_permissions].permissions
+
+    async def check_permission(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
+    ) -> None:
+        user_permissions = ROLE_PERMISSIONs[current_user.role].permissions
+        logger.debug(
+            f"User '{current_user.username}' with role '{current_user.role}' "
+            + f"has permissions '{user_permissions}'"
+        )
+
+        # Check if the user has the required permissions
+        if Permission.MANAGE_ALL_RESOURCES in user_permissions:
+            return  # Super Admin has all permissions
+
+        if not set(required_permissions).issubset(set(user_permissions)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+            )
+
+        # Additional checks for organization-specific permissions
+        if (
+            Permission.MANAGE_ORG_CONTENT in required_permissions
+            or Permission.MANAGE_ORG_USERS in required_permissions
+        ):
             pass
 
     return check_permission
