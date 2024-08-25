@@ -1,10 +1,26 @@
+import asyncio
+import concurrent.futures
+import functools
 import json
 import platform
 from datetime import date, datetime
-from typing import Any, Dict, Union
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Optional,
+    ParamSpec,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import psutil
 from app.schemas import JSONSerializable
+
+T = TypeVar("T")
+P = ParamSpec("P")
 
 
 def get_system_info(cpu_percent_interval: int = 1) -> Dict:
@@ -47,6 +63,55 @@ def is_json_serializable(obj: Union[JSONSerializable, Any]) -> bool:
         return True
     except TypeError:
         return False
+
+
+def is_coro_func(func: Union[Callable[P, T], Callable[P, Awaitable[T]]]) -> bool:
+    """Check the function a coroutine function or not."""
+    if not callable(func):
+        raise ValueError(f"The {func} is not callable.")
+
+    output = False
+
+    if isinstance(func, functools.partial):
+        if asyncio.iscoroutinefunction(func.func):
+            output = True
+
+    elif asyncio.iscoroutinefunction(func):
+        output = True
+
+    else:
+        if hasattr(func, "__call__") and asyncio.iscoroutinefunction(func.__call__):
+            output = True
+
+    return output
+
+
+async def run_as_coro(
+    func: Union[Callable[P, T], Callable[P, Awaitable[T]]],
+    *args,
+    max_workers: Optional[int] = None,
+    **kwargs,
+) -> T:
+    """Run a function in a thread or coroutine."""
+
+    if not callable(func):
+        raise ValueError(f"The {func} is not callable.")
+
+    output = None
+
+    if is_coro_func(func):
+        partial_func = functools.partial(func, *args, **kwargs)
+        partial_func = cast(Callable[[], Awaitable[T]], partial_func)
+        output = await partial_func()
+
+    else:
+        loop = asyncio.get_running_loop()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+            partial_func = functools.partial(func, *args, **kwargs)
+            output = await loop.run_in_executor(pool, partial_func)
+
+    output = cast(T, output)
+    return output
 
 
 class DateTimeEncoder(json.JSONEncoder):
