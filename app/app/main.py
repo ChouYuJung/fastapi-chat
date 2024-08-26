@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Text
 
 from app.config import logger, settings
-from app.deps.oauth import PermissionChecker
+from app.deps.oauth import UserPermissionChecker
 from app.schemas.oauth import Permission
 from app.utils.common import is_json_serializable
 from fastapi import Depends, FastAPI, Request
@@ -46,7 +46,13 @@ def create_app():
 
     @app.get(
         "/echo",
-        dependencies=[Depends(PermissionChecker([Permission.MANAGE_ALL_RESOURCES]))],
+        dependencies=[
+            Depends(
+                UserPermissionChecker(
+                    [Permission.MANAGE_ALL_RESOURCES], depends_type="platform_user"
+                )
+            )
+        ],
     )
     async def echo(request: Request):
         body = await request.body()

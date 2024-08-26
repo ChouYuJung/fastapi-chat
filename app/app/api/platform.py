@@ -3,11 +3,7 @@ from typing import Literal, Optional, Text
 from app.db._base import DatabaseBase
 from app.db.users import create_user, delete_user, list_users, update_user
 from app.deps.db import depend_db
-from app.deps.oauth import (
-    TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER,
-    PermissionChecker,
-    get_user_with_required_permissions_managing_target_user,
-)
+from app.deps.oauth import TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER, UserPermissionChecker
 from app.schemas.oauth import Permission, PlatformUserCreate, Role, User, UserUpdate
 from app.schemas.pagination import Pagination
 from app.utils.common import run_as_coro
@@ -19,7 +15,9 @@ router = APIRouter()
 
 @router.get(
     "/platform/users",
-    dependencies=[Depends(PermissionChecker([Permission.MANAGE_PLATFORM]))],
+    dependencies=[
+        Depends(UserPermissionChecker([Permission.MANAGE_PLATFORM], "platform_user"))
+    ],
 )
 async def api_list_platform_users(
     db: DatabaseBase = Depends(depend_db),
@@ -47,7 +45,9 @@ async def api_list_platform_users(
 
 @router.post(
     "/platform/users",
-    dependencies=[Depends(PermissionChecker([Permission.MANAGE_PLATFORM]))],
+    dependencies=[
+        Depends(UserPermissionChecker([Permission.MANAGE_PLATFORM], "platform_user"))
+    ],
 )
 def api_create_platform_user(
     user_create: PlatformUserCreate = Body(...),
@@ -73,8 +73,8 @@ def api_create_platform_user(
 @router.get("/platform/users/{user_id}")
 async def api_retrieve_platform_user(
     token_payload_data_user_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER = Depends(
-        get_user_with_required_permissions_managing_target_user(
-            [Permission.MANAGE_PLATFORM]
+        UserPermissionChecker(
+            [Permission.MANAGE_PLATFORM], "platform_user_managing_user"
         )
     ),
 ) -> User:
@@ -87,8 +87,8 @@ async def api_retrieve_platform_user(
 @router.put("/platform/users/{user_id}")
 def api_update_platform_user(
     token_payload_data_user_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER = Depends(
-        get_user_with_required_permissions_managing_target_user(
-            [Permission.MANAGE_PLATFORM]
+        UserPermissionChecker(
+            [Permission.MANAGE_PLATFORM], "platform_user_managing_user"
         )
     ),
     user_update: UserUpdate = Body(...),
@@ -108,8 +108,8 @@ def api_update_platform_user(
 @router.delete("/platform/users/{user_id}")
 def api_delete_platform_user(
     token_payload_data_user_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER = Depends(
-        get_user_with_required_permissions_managing_target_user(
-            [Permission.MANAGE_PLATFORM]
+        UserPermissionChecker(
+            [Permission.MANAGE_PLATFORM], "platform_user_managing_user"
         )
     ),
     db: DatabaseBase = Depends(depend_db),

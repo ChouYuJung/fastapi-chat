@@ -1,37 +1,50 @@
 import time
-from typing import Annotated, List, Text, Tuple, TypeAlias
+from typing import Annotated, List, Literal, Text, Tuple, TypeAlias, TypeVar
 
 from app.config import logger
 from app.db._base import DatabaseBase
 from app.db.tokens import is_token_blocked
-from app.db.users import get_user, get_user_by_id
+from app.db.users import get_user
 from app.deps.db import depend_db
 from app.schemas.oauth import (
     ROLE_PERMISSIONS,
+    Organization,
     PayloadParam,
     Permission,
     Role,
     TokenData,
     UserInDB,
 )
+from app.utils.common import run_as_coro
 from app.utils.oauth import oauth2_scheme, verify_payload, verify_token
 from fastapi import Depends, HTTPException
 from fastapi import Path as QueryPath
 from fastapi import status
 from pydantic_core import ValidationError
 
+T = TypeVar("T")
+
 TYPE_TOKEN_PAYLOAD: TypeAlias = Tuple[Text, PayloadParam]
 TYPE_TOKEN_PAYLOAD_DATA: TypeAlias = Tuple[Text, PayloadParam, TokenData]
 TYPE_TOKEN_PAYLOAD_DATA_USER: TypeAlias = Tuple[Text, PayloadParam, TokenData, UserInDB]
-TYPE_TOKEN_PAYLOAD_DATA_USER_ORG: TypeAlias = Tuple[
-    Text, PayloadParam, TokenData, UserInDB, Text
-]
 TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER: TypeAlias = Tuple[
     Text, PayloadParam, TokenData, UserInDB, UserInDB
 ]
+TYPE_TOKEN_PAYLOAD_DATA_USER_ORG: TypeAlias = Tuple[
+    Text, PayloadParam, TokenData, UserInDB, Organization
+]
+TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER: TypeAlias = Tuple[
+    Text, PayloadParam, TokenData, UserInDB, Organization, UserInDB
+]
 
 
-async def get_token_payload(token: Text = Depends(oauth2_scheme)) -> TYPE_TOKEN_PAYLOAD:
+async def depend_token(token: Text = Depends(oauth2_scheme)) -> Text:
+    return token
+
+
+async def depend_token_payload(
+    token: Text = Depends(depend_token),
+) -> TYPE_TOKEN_PAYLOAD:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -51,8 +64,8 @@ async def get_token_payload(token: Text = Depends(oauth2_scheme)) -> TYPE_TOKEN_
     return (token, payload)
 
 
-async def get_current_token_payload(
-    token_payload: Annotated[TYPE_TOKEN_PAYLOAD, Depends(get_token_payload)]
+async def depend_current_token_payload(
+    token_payload: Annotated[TYPE_TOKEN_PAYLOAD, Depends(depend_token_payload)]
 ) -> TYPE_TOKEN_PAYLOAD:
     payload = token_payload[1]
     if time.time() > payload["exp"]:
@@ -65,8 +78,8 @@ async def get_current_token_payload(
     return token_payload
 
 
-async def get_current_active_token_payload(
-    token_payload: Annotated[TYPE_TOKEN_PAYLOAD, Depends(get_current_token_payload)],
+async def depend_current_active_token_payload(
+    token_payload: Annotated[TYPE_TOKEN_PAYLOAD, Depends(depend_current_token_payload)],
     db: Annotated[DatabaseBase, Depends(depend_db)],
 ) -> TYPE_TOKEN_PAYLOAD:
 
@@ -81,9 +94,9 @@ async def get_current_active_token_payload(
     return token_payload
 
 
-async def get_current_active_token_payload_data(
+async def depend_current_active_token_payload_data(
     token_payload: Annotated[
-        TYPE_TOKEN_PAYLOAD, Depends(get_current_active_token_payload)
+        TYPE_TOKEN_PAYLOAD, Depends(depend_current_active_token_payload)
     ],
 ) -> TYPE_TOKEN_PAYLOAD_DATA:
     credentials_exception = HTTPException(
@@ -107,9 +120,9 @@ async def get_current_active_token_payload_data(
     return (token_payload[0], token_payload[1], token_data)
 
 
-async def get_current_user(
+async def depend_current_user(
     token_payload_data: Annotated[
-        TYPE_TOKEN_PAYLOAD_DATA, Depends(get_current_active_token_payload_data)
+        TYPE_TOKEN_PAYLOAD_DATA, Depends(depend_current_active_token_payload_data)
     ],
     db: Annotated[DatabaseBase, Depends(depend_db)],
 ) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
@@ -131,9 +144,9 @@ async def get_current_user(
     return (token_payload_data[0], token_payload_data[1], token_payload_data[2], user)
 
 
-async def get_current_active_user(
+async def depend_current_active_user(
     token_payload_data_user: Annotated[
-        TYPE_TOKEN_PAYLOAD_DATA_USER, Depends(get_current_user)
+        TYPE_TOKEN_PAYLOAD_DATA_USER, Depends(depend_current_user)
     ]
 ) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
     current_user = token_payload_data_user[3]
@@ -143,204 +156,247 @@ async def get_current_active_user(
     return token_payload_data_user
 
 
-async def get_current_active_user_of_org(
+async def depend_querying_user(
+    user_id: Text = QueryPath(..., description="The ID of the user to retrieve."),
+    db: DatabaseBase = Depends(depend_db),
+):
+    user = await run_as_coro(db.retrieve_user, user_id=user_id)
+    if user is None:
+        logger.debug(f"User '{user_id}' not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    return user
+
+
+async def depend_current_org(
     org_id: Text = QueryPath(
         ..., description="The ID of the organization to retrieve."
     ),
+    db: DatabaseBase = Depends(depend_db),
+):
+    current_org = await run_as_coro(db.retrieve_organization, organization_id=org_id)
+    if current_org is None:
+        logger.debug(f"Organization '{org_id}' not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+        )
+    return current_org
+
+
+async def depend_current_active_org(
+    current_org: Organization = Depends(depend_current_org),
+):
+    if current_org.disabled:
+        logger.debug(f"Organization '{current_org.id}' is inactive")
+        raise HTTPException(status_code=400, detail="Inactive organization")
+    return current_org
+
+
+async def depend_user_of_platform(
     token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
-        get_current_active_user
+        depend_current_active_user
+    ),
+) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
+    user = token_payload_data_user[3]
+    if user.role in (Role.SUPER_ADMIN, Role.PLATFORM_ADMIN):
+        pass
+    else:
+        logger.debug(f"User '{user.username}' is not a platform user")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
+    return token_payload_data_user
+
+
+async def depend_user_of_platform_managing_user(
+    target_user: UserInDB = Depends(depend_querying_user),
+    token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
+        depend_current_active_user
+    ),
+) -> TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER:
+    user = token_payload_data_user[3]
+    if user.role in (Role.SUPER_ADMIN, Role.PLATFORM_ADMIN):
+        pass
+    elif target_user.role == Role.SUPER_ADMIN:
+        logger.debug(
+            f"User '{user.username}' cannot manage Super Admin '{target_user.id}'"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
+    elif (
+        ROLE_PERMISSIONS[target_user.role].authority_level
+        > ROLE_PERMISSIONS[user.role].authority_level
+    ):
+        logger.debug(
+            f"User '{user.username}' cannot manage user '{target_user.id}' with higher role"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
+    return (
+        token_payload_data_user[0],
+        token_payload_data_user[1],
+        token_payload_data_user[2],
+        user,
+        target_user,
+    )
+
+
+async def depend_user_of_org(
+    org: Organization = Depends(depend_current_active_org),
+    token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
+        depend_current_active_user
     ),
 ) -> TYPE_TOKEN_PAYLOAD_DATA_USER_ORG:
     user = token_payload_data_user[3]
 
     if user.role in (Role.SUPER_ADMIN, Role.PLATFORM_ADMIN):
         pass
-
-    elif user.organization_id != org_id:
+    elif user.organization_id != org.id:
         logger.debug(
-            f"User '{user.username}' is not a member of organization '{org_id}'"
+            f"User '{user.username}' is not a member of organization '{org.id}'"
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
         )
-
     return (
         token_payload_data_user[0],
         token_payload_data_user[1],
         token_payload_data_user[2],
         user,
-        org_id,
+        org,
     )
 
 
-def get_user_with_required_permissions(required_permissions: List[Permission]):
-    """Check if the current user has the required permissions."""
+async def depend_user_of_org_managing_user(
+    target_user: UserInDB = Depends(depend_querying_user),
+    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
+        depend_user_of_org
+    ),
+) -> TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER:
+    user = token_payload_data_user_org[3]
+    org = token_payload_data_user_org[4]
 
-    def get_current_active_user_permissions(
-        token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
-            get_current_active_user
-        ),
-        # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
-    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
-        user = token_payload_data_user[3]
-        user_permissions = ROLE_PERMISSIONS[user.role].permissions
-        logger.debug(
-            f"User '{user.username}' with role '{user.role}' "
-            + f"has permissions '{user_permissions}'"
-        )
-
-        # Check if the user has the required permissions
-        if Permission.MANAGE_ALL_RESOURCES in user_permissions:
-            return token_payload_data_user  # Super Admin has all permissions
-
-        if not set(required_permissions).issubset(set(user_permissions)):
+    if user.role in (Role.SUPER_ADMIN, Role.PLATFORM_ADMIN):
+        pass
+    elif user.role == Role.ORG_ADMIN:
+        if target_user.organization_id != org.id:
+            logger.debug(
+                f"User '{user.username}' is not a member of organization '{org.id}'"
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
             )
+    elif user.role == Role.ORG_USER:  # User can only manage themselves
+        if target_user.organization_id != org.id or target_user.id != user.id:
+            logger.debug(
+                f"User '{user.username}' is not a member of organization '{org.id}'"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+            )
+    elif (
+        ROLE_PERMISSIONS[target_user.role].authority_level
+        > ROLE_PERMISSIONS[user.role].authority_level
+    ):
+        logger.debug(
+            f"User '{user.username}' cannot manage user '{target_user.id}' with higher role"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
+    return (
+        token_payload_data_user_org[0],
+        token_payload_data_user_org[1],
+        token_payload_data_user_org[2],
+        user,
+        org,
+        target_user,
+    )
 
-        # Additional checks for organization-specific permissions
-        if (
-            Permission.MANAGE_ORG_CONTENT in required_permissions
-            or Permission.MANAGE_ORG_USERS in required_permissions
-        ):
-            pass
 
-        return token_payload_data_user
-
-    return get_current_active_user_permissions
-
-
-def get_user_with_required_permissions_managing_target_user(
+def UserPermissionChecker(
     required_permissions: List[Permission],
+    depends_type: Literal[
+        "platform_user",
+        "platform_user_managing_user",
+        "org_user",
+        "org_user_managing_user",
+    ],
 ):
-    """Check if the current user has the required permissions
-    and is managing the target user."""
-
-    def get_current_active_user_permissions(
-        user_id: Text = QueryPath(..., description="The ID of the user in URL path."),
-        token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
-            get_current_active_user
-        ),
-        db: DatabaseBase = Depends(depend_db),
-    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER:
-        user = token_payload_data_user[3]
-        user_permissions = ROLE_PERMISSIONS[user.role].permissions
-        logger.debug(
-            f"User '{user.username}' with role '{user.role}' "
-            + f"has permissions '{user_permissions}'"
-        )
-
-        # Check if the user is managing the target user
-        target_user = get_user_by_id(db, user_id=user_id, organization_id=None)
-        if target_user is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
-        if (
-            ROLE_PERMISSIONS[target_user.role].authority_level
-            > ROLE_PERMISSIONS[user.role].authority_level
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
-            )
-        token_payload_data_user_target_user = (
-            token_payload_data_user[0],
-            token_payload_data_user[1],
-            token_payload_data_user[2],
-            token_payload_data_user[3],
-            target_user,
-        )
-
-        # Check if the user has the required permissions
-        if Permission.MANAGE_ALL_RESOURCES in user_permissions:
-            return (
-                token_payload_data_user_target_user  # Super Admin has all permissions
-            )
-
-        if not set(required_permissions).issubset(set(user_permissions)):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
-            )
-
-        # Additional checks for organization-specific permissions
-        if (
-            Permission.MANAGE_ORG_CONTENT in required_permissions
-            or Permission.MANAGE_ORG_USERS in required_permissions
-        ):
-            pass
-
-        return token_payload_data_user_target_user
-
-    return get_current_active_user_permissions
-
-
-def get_user_of_org_with_required_permissions(required_permissions: List[Permission]):
     """Check if the current user has the required permissions."""
 
-    def get_current_active_user_of_org_permissions(
-        token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-            get_current_active_user_of_org
-        ),
-        # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
-    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER_ORG:
-        user = token_payload_data_user_org[3]
+    def _depend_basic_user_permissions(_payload: T) -> T:
+        user: UserInDB = _payload[3]  # Get the user from the payload # type: ignore
         user_permissions = ROLE_PERMISSIONS[user.role].permissions
         logger.debug(
             f"User '{user.username}' with role '{user.role}' "
             + f"has permissions '{user_permissions}'"
         )
-
         # Check if the user has the required permissions
         if Permission.MANAGE_ALL_RESOURCES in user_permissions:
-            return token_payload_data_user_org  # Super Admin has all permissions
-
+            return _payload  # Super Admin has all permissions
         if not set(required_permissions).issubset(set(user_permissions)):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
             )
+        return _payload
 
+    def _depend_platform_user(
+        token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
+            depend_user_of_platform
+        ),
+    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER:
+        return _depend_basic_user_permissions(token_payload_data_user)
+
+    def _depend_platform_user_managing_user(
+        token_payload_data_user_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER = Depends(
+            depend_user_of_platform_managing_user
+        ),
+    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER:
+        return _depend_basic_user_permissions(token_payload_data_user_tar_user)
+
+    def _depend_org_user(
+        token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
+            depend_user_of_org
+        ),
+    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER_ORG:
+        token_payload_data_user_org = _depend_basic_user_permissions(
+            token_payload_data_user_org
+        )
         # Additional checks for organization-specific permissions
         if (
             Permission.MANAGE_ORG_CONTENT in required_permissions
             or Permission.MANAGE_ORG_USERS in required_permissions
         ):
             pass
-
         return token_payload_data_user_org
 
-    return get_current_active_user_of_org_permissions
-
-
-def PermissionChecker(required_permissions: List[Permission]):
-    """Check if the current user has the required permissions."""
-
-    async def check_permission(
-        token_payload_data_user: Annotated[
-            TYPE_TOKEN_PAYLOAD_DATA_USER, Depends(get_current_active_user)
-        ],
-        # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
-    ) -> None:
-        user = token_payload_data_user[3]
-        user_permissions = ROLE_PERMISSIONS[user.role].permissions
-        logger.debug(
-            f"User '{user.username}' with role '{user.role}' "
-            + f"has permissions '{user_permissions}'"
+    def _depend_org_user_managing_user(
+        token_payload_data_user_org_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER = Depends(
+            depend_user_of_org_managing_user
+        ),
+    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER:
+        token_payload_data_user_org_tar_user = _depend_basic_user_permissions(
+            token_payload_data_user_org_tar_user
         )
-
-        # Check if the user has the required permissions
-        if Permission.MANAGE_ALL_RESOURCES in user_permissions:
-            return  # Super Admin has all permissions
-
-        if not set(required_permissions).issubset(set(user_permissions)):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
-            )
-
         # Additional checks for organization-specific permissions
         if (
             Permission.MANAGE_ORG_CONTENT in required_permissions
             or Permission.MANAGE_ORG_USERS in required_permissions
         ):
             pass
+        return token_payload_data_user_org_tar_user
 
-    return check_permission
+    if depends_type == "platform_user":
+        return _depend_platform_user
+    elif depends_type == "platform_user_managing_user":
+        return _depend_platform_user_managing_user
+    elif depends_type == "org_user":
+        return _depend_org_user
+    elif depends_type == "org_user_managing_user":
+        return _depend_org_user_managing_user
+    else:
+        raise ValueError(f"Invalid depends_type: {depends_type}")
