@@ -5,16 +5,13 @@ from app.db.organizations import (
     create_organization,
     delete_organization,
     list_organizations,
-    retrieve_organization,
     update_organization,
 )
 from app.deps.db import depend_db
 from app.deps.oauth import (
     TYPE_TOKEN_PAYLOAD_DATA_USER,
     TYPE_TOKEN_PAYLOAD_DATA_USER_ORG,
-    PermissionChecker,
-    get_user_of_org_with_required_permissions,
-    get_user_with_required_permissions,
+    UserPermissionChecker,
 )
 from app.schemas.oauth import (
     Organization,
@@ -30,7 +27,11 @@ router = APIRouter()
 
 @router.get(
     "/organizations",
-    dependencies=[Depends(PermissionChecker([Permission.MANAGE_ORGANIZATIONS]))],
+    dependencies=[
+        Depends(
+            UserPermissionChecker([Permission.MANAGE_ORGANIZATIONS], "platform_user")
+        )
+    ],
 )
 async def api_list_organizations(
     disabled: Optional[bool] = Query(False),
@@ -51,7 +52,7 @@ async def api_list_organizations(
 async def api_create_organization(
     organization_create: OrganizationCreate = Body(...),
     token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
-        get_user_with_required_permissions([Permission.MANAGE_ORGANIZATIONS])
+        UserPermissionChecker([Permission.MANAGE_ORGANIZATIONS], "platform_user")
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> Organization:
@@ -72,19 +73,12 @@ async def api_create_organization(
 @router.get("/organizations/{org_id}")
 async def api_retrieve_organization(
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_with_required_permissions([Permission.MANAGE_ORG_CONTENT])
-    ),
-    db: DatabaseBase = Depends(depend_db),
+        UserPermissionChecker([Permission.MANAGE_ORG_CONTENT], "org_user")
+    )
 ) -> Organization:
     """Retrieve an organization by its ID."""
 
-    org_id = token_payload_data_user_org[4]
-
-    org = await retrieve_organization(db, organization_id=org_id)
-    if org is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
-        )
+    org = token_payload_data_user_org[4]
     return org
 
 
@@ -92,36 +86,34 @@ async def api_retrieve_organization(
 async def api_update_organization(
     organization_update: OrganizationUpdate = Body(...),
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_CONTENT])
+        UserPermissionChecker([Permission.MANAGE_ORG_CONTENT], "platform_user")
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> Organization:
     """Update an organization by its ID."""
 
-    org_id = token_payload_data_user_org[4]
-
-    org = await update_organization(
-        db, organization_id=org_id, organization_update=organization_update
+    org = token_payload_data_user_org[4]
+    updated_org = await update_organization(
+        db, organization_id=org.id, organization_update=organization_update
     )
-    if org is None:
+    if updated_org is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
         )
-
-    return org
+    return updated_org
 
 
 @router.delete("/organizations/{org_id}")
 async def api_delete_organization(
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_with_required_permissions([Permission.MANAGE_ORGANIZATIONS])
+        UserPermissionChecker([Permission.MANAGE_ORGANIZATIONS], "platform_user")
     ),
     db: DatabaseBase = Depends(depend_db),
 ):
     """Delete an organization by its ID."""
 
-    org_id = token_payload_data_user_org[4]
+    org = token_payload_data_user_org[4]
 
-    await delete_organization(db, organization_id=org_id, soft_delete=True)
+    await delete_organization(db, organization_id=org.id, soft_delete=True)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
