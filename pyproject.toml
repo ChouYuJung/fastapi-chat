@@ -30,6 +30,7 @@ all = []
 
 [tool.poetry.group.dev.dependencies]
 black = "*"
+faker = "*"
 isort = "*"
 poetry-plugin-export = "*"
 pytest = "*"
