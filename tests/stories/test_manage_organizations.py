@@ -1,13 +1,16 @@
 from typing import Dict, Text
 
+import httpx
 import pytest
 from app.schemas.oauth import (
     Organization,
     OrganizationCreate,
     OrganizationUpdate,
     PlatformUserCreate,
+    Role,
     Token,
     User,
+    UserCreate,
 )
 from app.schemas.pagination import Pagination
 from faker import Faker
@@ -97,7 +100,7 @@ async def test_platform_create_organizations(client: TestClient):
         {"name": org_1_name, "description": fake.text()}
     )
     response = client.post(
-        "/organizations",
+        "/organizations/",
         json=org_1_create.model_dump(exclude_none=True),
         headers=get_token(
             client=client, **platform_user_login_data, cache=cache_tokens
@@ -163,6 +166,51 @@ async def test_platform_update_organizations(client: TestClient):
 
 
 @pytest.mark.asyncio
+async def test_platform_create_organization_user(client: TestClient):
+    assert await auth_me(client, platform_user_login_data, cache_tokens=cache_tokens)
+
+    org_1 = Organization.model_validate(
+        client.get(
+            "/organizations",
+            headers=get_token(
+                client=client, **platform_user_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()["data"][0]
+    )
+
+    # Create Organization 1 and 2
+    org_1_usr_create = UserCreate.model_validate(
+        {
+            "username": org_1_user_login_data["username"],
+            "email": fake.safe_email(),
+            "password": org_1_user_login_data["password"],
+            "full_name": fake.name(),
+            "role": Role.ORG_ADMIN.value,
+        }
+    )
+    response = client.post(
+        f"/organizations/{org_1.id}/users",
+        json=org_1_usr_create.model_dump(exclude_none=True),
+        headers=get_token(
+            client=client, **platform_user_login_data, cache=cache_tokens
+        ).to_headers(),
+    )
+    response.raise_for_status()
+    user_1 = User.model_validate(response.json())
+    assert user_1
+
+    # Retrieve the created user
+    assert User.model_validate(
+        client.get(
+            f"/organizations/{org_1.id}/users/{user_1.id}",
+            headers=get_token(
+                client=client, **platform_user_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
+
+
+@pytest.mark.asyncio
 async def test_platform_delete_organizations(client: TestClient):
     assert await auth_me(client, platform_user_login_data, cache_tokens=cache_tokens)
 
@@ -183,6 +231,7 @@ async def test_platform_delete_organizations(client: TestClient):
         ).to_headers(),
     )
     response.raise_for_status()
+
     # Platform user should be able to retrieve the deleted organization,
     # but org user should not
     response = client.get(
@@ -194,6 +243,15 @@ async def test_platform_delete_organizations(client: TestClient):
     response.raise_for_status()
     deleted_org_1 = Organization.model_validate(response.json())
     assert deleted_org_1.disabled is True
+    # Org user should not be able to retrieve the deleted organization
+    with pytest.raises(httpx.HTTPStatusError):
+        response = client.get(
+            f"/organizations/{org_1.id}",
+            headers=get_token(
+                client=client, **org_1_user_login_data, cache=cache_tokens
+            ).to_headers(),
+        )
+        response.raise_for_status()
 
     # Recover Organization 2
     recovered_org_1 = Organization.model_validate(

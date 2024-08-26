@@ -7,7 +7,7 @@ from app.schemas.pagination import Pagination
 from faker import Faker
 from fastapi.testclient import TestClient
 
-from tests.utils import LoginData, get_token
+from tests.utils import LoginData, auth_me, get_token
 
 fake = Faker()
 
@@ -189,19 +189,14 @@ async def test_platform_user_operations(client: TestClient):
 
 @pytest.mark.asyncio
 async def test_platform_user_failures(client: TestClient):
-    user_me = User.model_validate(
-        client.get(
-            "/auth/me",
-            headers=get_token(
-                client=client, **platform_user_1_login_data, cache=cache_tokens
-            ).to_headers(),
-        ).json()
+    platform_user_1 = await auth_me(
+        client, platform_user_1_login_data, cache_tokens=cache_tokens
     )
 
     # Try modify self as platform user
     with pytest.raises(httpx.HTTPStatusError):
         response = client.put(
-            f"/platform/users/{user_me.id}",
+            f"/platform/users/{platform_user_1.id}",
             json={"role": Role.SUPER_ADMIN.value},
             headers=get_token(
                 client=client, **platform_user_1_login_data, cache=cache_tokens
@@ -210,18 +205,31 @@ async def test_platform_user_failures(client: TestClient):
         response.raise_for_status()
 
     # Try modify the superuser as platform user
-    superuser = User.model_validate(
-        client.get(
-            "/auth/me",
-            headers=get_token(
-                client=client, **superuser_login_data, cache=cache_tokens
-            ).to_headers(),
-        ).json()
-    )
+    superuser = await auth_me(client, superuser_login_data, cache_tokens=cache_tokens)
     with pytest.raises(httpx.HTTPStatusError):
         response = client.put(
             f"/platform/users/{superuser.id}",
             json={"role": Role.PLATFORM_ADMIN.value},
+            headers=get_token(
+                client=client, **platform_user_1_login_data, cache=cache_tokens
+            ).to_headers(),
+        )
+        response.raise_for_status()
+
+    # Try create not platform user
+    new_user_create = UserCreate.model_validate(
+        {
+            "username": fake.user_name(),
+            "email": fake.safe_email(),
+            "password": fake.password(),
+            "full_name": fake.name(),
+            "role": Role.ORG_ADMIN.value,
+        }
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        response = client.post(
+            "/platform/users",
+            json=new_user_create.model_dump(exclude_none=True),
             headers=get_token(
                 client=client, **platform_user_1_login_data, cache=cache_tokens
             ).to_headers(),
