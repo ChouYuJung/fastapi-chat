@@ -17,11 +17,11 @@
   },
   "[md]": {
     "editor.tabSize": 4,
-    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
   },
   "[markdown]": {
     "editor.tabSize": 4,
-    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
   },
   "[json]": {
     "editor.tabSize": 2,
@@ -44,4 +44,11 @@
   "evenBetterToml.formatter.reorderArrays": true,
   "evenBetterToml.formatter.arrayAutoCollapse": true,
   "evenBetterToml.formatter.arrayAutoExpand": false,
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}",
+    "${workspaceFolder}/app"
+  ],
+  "terminal.integrated.env.windows": {
+    "PYTHONPATH": "${workspaceFolder};${workspaceFolder}/app"
+  }
 }
