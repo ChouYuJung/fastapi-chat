@@ -1,6 +1,6 @@
 from typing import Dict, Optional, Text, TypedDict
 
-from app.schemas.oauth import Token
+from app.schemas.oauth import Token, User
 from fastapi.testclient import TestClient
 
 
@@ -25,6 +25,21 @@ def get_token(
     if cache is not None:
         cache[username] = token
     return token
+
+
+async def auth_me(
+    client: TestClient, login_data: "LoginData", *, cache_tokens: Dict[Text, Token]
+) -> "User":
+    user = User.model_validate(
+        client.get(
+            "/auth/me",
+            headers=get_token(
+                client=client, **login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
+    assert user
+    return user
 
 
 class LoginData(TypedDict):

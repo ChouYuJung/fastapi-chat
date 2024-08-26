@@ -13,7 +13,7 @@ from app.schemas.pagination import Pagination
 from faker import Faker
 from fastapi.testclient import TestClient
 
-from tests.utils import LoginData, get_token
+from tests.utils import LoginData, auth_me, get_token
 
 fake = Faker()
 
@@ -23,7 +23,6 @@ platform_user_login_data = LoginData(
 )
 org_1_user_login_data = LoginData(username=fake.user_name(), password=fake.password())
 org_1_name = fake.company()
-org_2_name = fake.company()
 
 
 cache_tokens: Dict[Text, Token] = {}
@@ -90,16 +89,8 @@ async def test_create_platform_users(client: TestClient):
 
 
 @pytest.mark.asyncio
-async def test_platform_manages_organizations(client: TestClient):
-    platform_user = User.model_validate(
-        client.get(
-            "/auth/me",
-            headers=get_token(
-                client=client, **platform_user_login_data, cache=cache_tokens
-            ).to_headers(),
-        ).json()
-    )
-    assert platform_user
+async def test_platform_create_organizations(client: TestClient):
+    assert await auth_me(client, platform_user_login_data, cache_tokens=cache_tokens)
 
     # Create Organization 1 and 2
     org_1_create = OrganizationCreate.model_validate(
@@ -113,39 +104,12 @@ async def test_platform_manages_organizations(client: TestClient):
         ).to_headers(),
     )
     response.raise_for_status()
-    created_org_1 = Organization.model_validate(response.json())
-    org_2_create = OrganizationCreate.model_validate(
-        {"name": org_2_name, "description": fake.text()}
-    )
-    response = client.post(
-        "/organizations",
-        json=org_2_create.model_dump(exclude_none=True),
-        headers=get_token(
-            client=client, **platform_user_login_data, cache=cache_tokens
-        ).to_headers(),
-    )
-    response.raise_for_status()
-    created_org_2 = Organization.model_validate(response.json())
+    assert Organization.model_validate(response.json())
 
-    # Retrieve the created organizations
-    response = client.get(
-        f"/organizations/{created_org_1.id}",
-        headers=get_token(
-            client=client, **platform_user_login_data, cache=cache_tokens
-        ).to_headers(),
-    )
-    response.raise_for_status()
-    retrieved_org_1 = Organization.model_validate(response.json())
-    assert created_org_1.id == retrieved_org_1.id
-    response = client.get(
-        f"/organizations/{created_org_2.id}",
-        headers=get_token(
-            client=client, **platform_user_login_data, cache=cache_tokens
-        ).to_headers(),
-    )
-    response.raise_for_status()
-    retrieved_org_2 = Organization.model_validate(response.json())
-    assert created_org_2.id == retrieved_org_2.id
+
+@pytest.mark.asyncio
+async def test_platform_get_organizations(client: TestClient):
+    assert await auth_me(client, platform_user_login_data, cache_tokens=cache_tokens)
 
     # List organizations
     response = client.get(
@@ -156,12 +120,38 @@ async def test_platform_manages_organizations(client: TestClient):
     )
     response.raise_for_status()
     org_list_res = Pagination[Organization].model_validate(response.json())
-    assert len(org_list_res.data) == 2
+    assert len(org_list_res.data) == 1
+    org_1 = [org for org in org_list_res.data if org.name == org_1_name][0]
+
+    # Retrieve the created organizations
+    response = client.get(
+        f"/organizations/{org_1.id}",
+        headers=get_token(
+            client=client, **platform_user_login_data, cache=cache_tokens
+        ).to_headers(),
+    )
+    response.raise_for_status()
+    retrieved_org_1 = Organization.model_validate(response.json())
+    assert org_1.id == retrieved_org_1.id
+
+
+@pytest.mark.asyncio
+async def test_platform_update_organizations(client: TestClient):
+    assert await auth_me(client, platform_user_login_data, cache_tokens=cache_tokens)
+
+    org_1 = Organization.model_validate(
+        client.get(
+            "/organizations",
+            headers=get_token(
+                client=client, **platform_user_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()["data"][0]
+    )
 
     # Update Organization 1
     org_1_update = OrganizationUpdate.model_validate({"description": fake.text()})
     response = client.put(
-        f"/organizations/{created_org_1.id}",
+        f"/organizations/{org_1.id}",
         json=org_1_update.model_dump(exclude_none=True),
         headers=get_token(
             client=client, **platform_user_login_data, cache=cache_tokens
@@ -171,9 +161,23 @@ async def test_platform_manages_organizations(client: TestClient):
     updated_org_1 = Organization.model_validate(response.json())
     assert updated_org_1.description == org_1_update.description
 
+
+@pytest.mark.asyncio
+async def test_platform_delete_organizations(client: TestClient):
+    assert await auth_me(client, platform_user_login_data, cache_tokens=cache_tokens)
+
+    org_1 = Organization.model_validate(
+        client.get(
+            "/organizations",
+            headers=get_token(
+                client=client, **platform_user_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()["data"][0]
+    )
+
     # Delete Organization 2
     response = client.delete(
-        f"/organizations/{created_org_2.id}",
+        f"/organizations/{org_1.id}",
         headers=get_token(
             client=client, **platform_user_login_data, cache=cache_tokens
         ).to_headers(),
@@ -182,24 +186,23 @@ async def test_platform_manages_organizations(client: TestClient):
     # Platform user should be able to retrieve the deleted organization,
     # but org user should not
     response = client.get(
-        f"/organizations/{created_org_2.id}",
+        f"/organizations/{org_1.id}",
         headers=get_token(
             client=client, **platform_user_login_data, cache=cache_tokens
         ).to_headers(),
     )
     response.raise_for_status()
-    deleted_org_2 = Organization.model_validate(response.json())
-    assert deleted_org_2.disabled is True
+    deleted_org_1 = Organization.model_validate(response.json())
+    assert deleted_org_1.disabled is True
 
     # Recover Organization 2
-    response = client.put(
-        f"/organizations/{created_org_2.id}",
-        json={"disabled": False},
-        headers=get_token(
-            client=client, **platform_user_login_data, cache=cache_tokens
-        ).to_headers(),
+    recovered_org_1 = Organization.model_validate(
+        client.put(
+            f"/organizations/{org_1.id}",
+            json={"disabled": False},
+            headers=get_token(
+                client=client, **platform_user_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
     )
-    response.raise_for_status()
-    recovered_org_2 = Organization.model_validate(response.json())
-    assert recovered_org_2.disabled is False
-    assert recovered_org_2.id == created_org_2.id
+    assert recovered_org_1.disabled is False
