@@ -14,10 +14,10 @@ from app.db.users import (
 from app.deps.db import depend_db
 from app.deps.oauth import (
     TYPE_TOKEN_PAYLOAD_DATA_USER_ORG,
-    get_user_of_org_with_required_permissions,
+    TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER,
+    UserPermissionChecker,
 )
 from app.schemas.oauth import (
-    ROLE_PERMISSIONS,
     Permission,
     Token,
     User,
@@ -32,24 +32,6 @@ from fastapi import Path as QueryPath
 from fastapi import Query, Response, status
 
 router = APIRouter()
-
-
-@router.get("/organizations/{org_id}/users/me")
-async def read_users_me(
-    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions([Permission.USE_ORG_CONTENT])
-    ),
-) -> User:
-    """Retrieve the current user."""
-
-    org_id = token_payload_data_user_org[4]
-    user = token_payload_data_user_org[3]
-    if user.organization_id != org_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this organization",
-        )
-    return user
 
 
 @router.post("/organizations/{org_id}/users/register", response_model=Token)
@@ -69,31 +51,20 @@ async def api_register(
         },
     ),
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_USERS])
+        UserPermissionChecker([Permission.MANAGE_ORG_USERS], "org_user")
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> Token:
     """Register a new user with the given username and password."""
 
-    org_id = token_payload_data_user_org[4]
-    api_user = token_payload_data_user_org[3]
-
-    # API user could not register a user with a role higher or equal to their own.
-    if (
-        ROLE_PERMISSIONS[user_guest_register.role].authority_level
-        >= ROLE_PERMISSIONS[api_user.role].authority_level
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to create a user with this role",
-        )
+    org = token_payload_data_user_org[4]
 
     # Create a new user with the given username and password.
     created_user = create_user(
         db,
         user_create=user_guest_register,
         hashed_password=get_password_hash(user_guest_register.password),
-        organization_id=org_id,
+        organization_id=org.id,
         allow_org_empty=False,
     )
     if created_user is None:
@@ -125,18 +96,18 @@ async def api_list_users(
     before: Optional[Text] = Query(None),
     limit: Optional[int] = Query(10, ge=1, le=100),
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_USERS])
+        UserPermissionChecker([Permission.MANAGE_ORG_USERS], "org_user")
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> Pagination[User]:
     """Search for users by username or other criteria."""
 
-    org_id = token_payload_data_user_org[4]
-    assert token_payload_data_user_org[3]
+    org = token_payload_data_user_org[4]
+
     return Pagination[User].model_validate(
         list_users(
             db,
-            organization_id=org_id,
+            organization_id=org.id,
             disabled=disabled,
             sort=sort,
             start=start,
@@ -164,20 +135,19 @@ async def api_create_user(
         },
     ),
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_USERS])
+        UserPermissionChecker([Permission.MANAGE_ORG_USERS], "org_user")
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:
     """Create a new user."""
 
-    assert token_payload_data_user_org[3]
-    org_id = token_payload_data_user_org[4]
+    org = token_payload_data_user_org[4]
 
     created_user = create_user(
         db,
         user_create=user_create,
         hashed_password=get_password_hash(user_create.password),
-        organization_id=org_id,
+        organization_id=org.id,
         allow_org_empty=False,
     )
     if created_user is None:
@@ -190,17 +160,16 @@ async def api_create_user(
 @router.get("/organizations/{org_id}/users/{user_id}")
 async def api_retrieve_user(
     user_id: Text = QueryPath(..., min_length=4, max_length=64),
-    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_USERS])
+    token_payload_data_user_org_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER = Depends(
+        UserPermissionChecker([Permission.MANAGE_ORG_USERS], "org_user_managing_user")
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:
     """Retrieve user profile information."""
 
-    org_id = token_payload_data_user_org[4]
-    assert token_payload_data_user_org[3]
+    org = token_payload_data_user_org_tar_user[4]
 
-    user = get_user_by_id(db, organization_id=org_id, user_id=user_id)
+    user = get_user_by_id(db, organization_id=org.id, user_id=user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -212,18 +181,17 @@ async def api_retrieve_user(
 async def api_update_user(
     user_id: Text,
     user_update: UserUpdate = Body(...),
-    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_USERS])
+    token_payload_data_user_org_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER = Depends(
+        UserPermissionChecker([Permission.MANAGE_ORG_USERS], "org_user_managing_user")
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:
     """Update user profile information."""
 
-    org_id = token_payload_data_user_org[4]
-    assert token_payload_data_user_org[3]
+    org = token_payload_data_user_org_tar_user[4]
 
     user = update_user(
-        db, organization_id=org_id, user_id=user_id, user_update=user_update
+        db, organization_id=org.id, user_id=user_id, user_update=user_update
     )
     if user is None:
         raise HTTPException(
@@ -237,20 +205,19 @@ async def api_update_user(
 )
 async def api_delete_user(
     user_id: Text,
-    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        get_user_of_org_with_required_permissions([Permission.MANAGE_ORG_USERS])
+    token_payload_data_user_org_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER = Depends(
+        UserPermissionChecker([Permission.MANAGE_ORG_USERS], "org_user_managing_user")
     ),
     db: DatabaseBase = Depends(depend_db),
 ):
     """Delete a user."""
 
-    org_id = token_payload_data_user_org[4]
-    assert token_payload_data_user_org[3]
+    org = token_payload_data_user_org_tar_user[4]
 
     user = delete_user(
         db,
         user_id=user_id,
-        organization_id=org_id,
+        organization_id=org.id,
         soft_delete=True,
     )
     if user is None:
