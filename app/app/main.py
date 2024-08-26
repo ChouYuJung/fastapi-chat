@@ -1,4 +1,5 @@
 import json
+from contextlib import asynccontextmanager
 from typing import Any, Text
 
 from app.config import logger, settings
@@ -8,8 +9,32 @@ from app.utils.common import is_json_serializable
 from fastapi import Depends, FastAPI, Request
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan context manager."""
+
+    print(f"Application '{settings.app_name}' is starting up.")
+
+    # <SET_APP_STATE>
+    # <SET_DB>
+    from app.db._base import DatabaseBase
+
+    _db = DatabaseBase.from_url(settings.DB_URL)
+    logger.info(f"Connected to database: {_db}")
+    _db.touch()
+    set_app_state(app, key="db", value=_db)
+    # </SET_DB>
+    # </SET_APP_STATE>
+
+    yield
+
+    print(f"Application '{settings.app_name}' is shutting down.")
+
+
 def create_app():
-    app = FastAPI(title=settings.app_name.title(), version=settings.app_version)
+    app = FastAPI(
+        title=settings.app_name.title(), version=settings.app_version, lifespan=lifespan
+    )
 
     @app.get("/")
     async def root():
@@ -38,14 +63,6 @@ def create_app():
     from .api._router import router as api_router
 
     app.include_router(api_router)
-
-    # Set app state
-    from app.db._base import DatabaseBase
-
-    _db = DatabaseBase.from_url(settings.DB_URL)
-    logger.info(f"Connected to database: {_db}")
-    _db.touch()
-    set_app_state(app, key="db", value=_db)
 
     return app
 
