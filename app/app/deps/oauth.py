@@ -249,12 +249,15 @@ def PermissionChecker(required_permissions: List[Permission]):
     """Check if the current user has the required permissions."""
 
     async def check_permission(
-        current_user: Annotated[User, Depends(get_current_active_user)],
+        token_payload_data_user: Annotated[
+            TYPE_TOKEN_PAYLOAD_DATA_USER, Depends(get_current_active_user)
+        ],
         # db: DatabaseBase = Depends(depend_db),  # Implement this if you need to access the database
     ) -> None:
-        user_permissions = ROLE_PERMISSIONS[current_user.role].permissions
+        user = token_payload_data_user[3]
+        user_permissions = ROLE_PERMISSIONS[user.role].permissions
         logger.debug(
-            f"User '{current_user.username}' with role '{current_user.role}' "
+            f"User '{user.username}' with role '{user.role}' "
             + f"has permissions '{user_permissions}'"
         )
 

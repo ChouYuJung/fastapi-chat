@@ -276,6 +276,9 @@ class Token(BaseModel):
         token_data["username"] = username
         return TokenInDB.model_validate(token_data)
 
+    def to_headers(self) -> Dict[Text, Text]:
+        return {"Authorization": f"Bearer {self.access_token}"}
+
 
 class TokenInDB(Token):
     model_config = ConfigDict(str_strip_whitespace=True)
