@@ -30,18 +30,36 @@ This API is designed to be scalable, secure, and efficient, catering to the need
 
 ### 1. Authentication API
 
-- POST /auth/register: Create a new user account
-- POST /auth/login: Authenticate a user and generate access token
+- GET /auth/me: Retrieve the current user's profile information
+- POST /auth/token or POST /auth/login: Authenticate a user and generate access token
 - POST /auth/logout: Log out a user and invalidate their token
 - POST /auth/refresh-token: Refresh an expired access token
 
 ### 2. User Profile API
 
-- GET /users/me: Retrieve the current user's profile information
-- GET /users: List users with optional filtering and pagination
-- POST /users: Create a new user
-- GET /users/{user_id}: Retrieve user profile information
-- PUT /users/{user_id}: Update user profile information
+- GET /platform/users: List platform users with optional filtering and pagination
+- POST /platform/users: Create a new platform user
+- GET /platform/users/{user_id}: Retrieve platform user profile information
+- PUT /platform/users/{user_id}: Update platform user profile information
+- DELETE /platform/users/{user_id}: Delete a platform user
+
+### 3. Organization Management API
+
+- GET /organizations/me: Retrieve the current user's organization
+- GET /organizations: List organizations with optional filtering and pagination
+- POST /organizations: Create a new organization
+- GET /organizations/{org_id}: Retrieve an organization by ID
+- PUT /organizations/{org_id}: Update an organization
+- DELETE /organizations/{org_id}: Delete an organization
+
+### 4. Organization User Management API
+
+- POST /organizations/{org_id}/users/register: Register a new user for an organization
+- GET /organizations/{org_id}/users: List users in an organization with optional filtering and pagination
+- POST /organizations/{org_id}/users: Create a new user in an organization
+- GET /organizations/{org_id}/users/{user_id}: Retrieve user profile information in an organization
+- PUT /organizations/{org_id}/users/{user_id}: Update user profile information in an organization
+- DELETE /organizations/{org_id}/users/{user_id}: Delete a user from an organization
 
 ## Messaging APIs
 
