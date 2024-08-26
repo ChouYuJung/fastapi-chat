@@ -111,9 +111,7 @@ async def test_platform_user_operations(client: TestClient):
     assert any(user.id == platform_user_2.id for user in user_list_res.data)
 
     # Update the new platform user
-    user_update = UserUpdate.model_validate(
-        {"email": fake.safe_email(), "disabled": True}
-    )
+    user_update = UserUpdate.model_validate({"email": fake.safe_email()})
     response = client.put(
         f"/platform/users/{platform_user_2.id}",
         json=user_update.model_dump(exclude_none=True),
@@ -122,29 +120,7 @@ async def test_platform_user_operations(client: TestClient):
     response.raise_for_status()
     updated_platform_user = User.model_validate(response.json())
     assert updated_platform_user.email == user_update.email
-    assert updated_platform_user.disabled is True
     platform_user_2 = updated_platform_user
-
-    # Check that the updated platform user is in the list of platform users
-    response = client.get(
-        "/platform/users",
-        headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
-    )
-    response.raise_for_status()
-    user_list_res = Pagination[User].model_validate(response.json())
-    assert len(user_list_res.data) == 2
-    assert any(user.id == platform_user_2.id for user in user_list_res.data)
-
-    # Check list users filtered disabled
-    response = client.get(
-        "/platform/users?disabled=true",
-        headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
-        params={"disabled": False},
-    )
-    response.raise_for_status()
-    user_list_res = Pagination[User].model_validate(response.json())
-    assert len(user_list_res.data) == 1
-    assert not any(user.id == platform_user_2.id for user in user_list_res.data)
 
     # Retrieve the updated platform user
     response = client.get(
@@ -154,6 +130,30 @@ async def test_platform_user_operations(client: TestClient):
     response.raise_for_status()
     retrieved_updated_platform_user = User.model_validate(response.json())
     assert retrieved_updated_platform_user.email == platform_user_2.email
-    assert retrieved_updated_platform_user.disabled is True
+
     assert retrieved_updated_platform_user.id == platform_user_2.id
     platform_user_2 = retrieved_updated_platform_user
+
+    # Delete the new platform user (soft delete)
+    response = client.delete(
+        f"/platform/users/{platform_user_2.id}",
+        headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+    )
+    response.raise_for_status()
+    response = client.get(
+        f"/platform/users/{platform_user_2.id}",
+        headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+    )
+    response.raise_for_status()
+    platform_user_2 = User.model_validate(response.json())
+    assert platform_user_2.disabled is True
+    # Check list users filtered disabled
+    response = client.get(
+        "/platform/users",
+        headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+        params={"disabled": False},
+    )
+    response.raise_for_status()
+    user_list_res = Pagination[User].model_validate(response.json())
+    assert len(user_list_res.data) == 1
+    assert not any(user.id == platform_user_2.id for user in user_list_res.data)
