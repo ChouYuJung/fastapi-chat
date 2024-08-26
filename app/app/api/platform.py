@@ -1,16 +1,14 @@
 from typing import Literal, Optional, Text
 
 from app.db._base import DatabaseBase
-from app.db.users import (
-    create_user,
-    delete_user,
-    get_user_by_id,
-    list_users,
-    update_user,
-)
+from app.db.users import create_user, delete_user, list_users, update_user
 from app.deps.db import depend_db
-from app.deps.oauth import PermissionChecker
-from app.schemas.oauth import Permission, Role, User, UserCreate, UserUpdate
+from app.deps.oauth import (
+    TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER,
+    PermissionChecker,
+    get_user_with_required_permissions_managing_target_user,
+)
+from app.schemas.oauth import Permission, PlatformUserCreate, Role, User, UserUpdate
 from app.schemas.pagination import Pagination
 from app.utils.common import run_as_coro
 from app.utils.oauth import get_password_hash
@@ -52,7 +50,7 @@ async def api_list_platform_users(
     dependencies=[Depends(PermissionChecker([Permission.MANAGE_PLATFORM]))],
 )
 def api_create_platform_user(
-    user_create: UserCreate = Body(...),
+    user_create: PlatformUserCreate = Body(...),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:
     """Create a new platform user."""
@@ -72,35 +70,34 @@ def api_create_platform_user(
     return created_user
 
 
-@router.get(
-    "/platform/users/{user_id}",
-    dependencies=[Depends(PermissionChecker([Permission.MANAGE_PLATFORM]))],
-)
+@router.get("/platform/users/{user_id}")
 async def api_retrieve_platform_user(
-    user_id: Text, db: DatabaseBase = Depends(depend_db)
+    token_payload_data_user_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER = Depends(
+        get_user_with_required_permissions_managing_target_user(
+            [Permission.MANAGE_PLATFORM]
+        )
+    ),
 ) -> User:
     """Retrieve a platform user."""
 
-    user = await run_as_coro(get_user_by_id, db, user_id=user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
-    return user
+    target_user = token_payload_data_user_tar_user[4]
+    return target_user
 
 
-@router.put(
-    "/platform/users/{user_id}",
-    dependencies=[Depends(PermissionChecker([Permission.MANAGE_PLATFORM]))],
-)
+@router.put("/platform/users/{user_id}")
 def api_update_platform_user(
-    user_id: Text,
+    token_payload_data_user_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER = Depends(
+        get_user_with_required_permissions_managing_target_user(
+            [Permission.MANAGE_PLATFORM]
+        )
+    ),
     user_update: UserUpdate = Body(...),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:
     """Update a platform user."""
 
-    updated_user = update_user(db, user_id=user_id, user_update=user_update)
+    target_user_id = token_payload_data_user_tar_user[4].id
+    updated_user = update_user(db, user_id=target_user_id, user_update=user_update)
     if updated_user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -108,23 +105,25 @@ def api_update_platform_user(
     return updated_user
 
 
-@router.delete(
-    "/platform/users/{user_id}",
-    dependencies=[Depends(PermissionChecker([Permission.MANAGE_PLATFORM]))],
-)
+@router.delete("/platform/users/{user_id}")
 def api_delete_platform_user(
-    user_id: Text,
+    token_payload_data_user_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER = Depends(
+        get_user_with_required_permissions_managing_target_user(
+            [Permission.MANAGE_PLATFORM]
+        )
+    ),
     db: DatabaseBase = Depends(depend_db),
 ) -> Response:
     """Delete a platform user."""
 
-    user = delete_user(
+    target_user_id = token_payload_data_user_tar_user[4].id
+    success = delete_user(
         db,
-        user_id=user_id,
+        user_id=target_user_id,
         organization_id=None,
         soft_delete=True,
     )
-    if user is None:
+    if success is False:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )

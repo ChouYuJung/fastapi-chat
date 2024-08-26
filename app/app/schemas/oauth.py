@@ -236,6 +236,11 @@ class UserCreate(BaseModel):
         )
 
 
+class PlatformUserCreate(UserCreate):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    role: Literal[Role.PLATFORM_ADMIN] = Field(default=Role.PLATFORM_ADMIN)
+
+
 class UserGuestRegister(UserCreate):
     model_config = ConfigDict(str_strip_whitespace=True)
     role: Literal[Role.ORG_GUEST] = Field(default=Role.ORG_GUEST)

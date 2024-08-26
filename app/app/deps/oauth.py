@@ -4,7 +4,7 @@ from typing import Annotated, List, Text, Tuple, TypeAlias
 from app.config import logger
 from app.db._base import DatabaseBase
 from app.db.tokens import is_token_blocked
-from app.db.users import get_user
+from app.db.users import get_user, get_user_by_id
 from app.deps.db import depend_db
 from app.schemas.oauth import (
     ROLE_PERMISSIONS,
@@ -25,6 +25,9 @@ TYPE_TOKEN_PAYLOAD_DATA: TypeAlias = Tuple[Text, PayloadParam, TokenData]
 TYPE_TOKEN_PAYLOAD_DATA_USER: TypeAlias = Tuple[Text, PayloadParam, TokenData, UserInDB]
 TYPE_TOKEN_PAYLOAD_DATA_USER_ORG: TypeAlias = Tuple[
     Text, PayloadParam, TokenData, UserInDB, Text
+]
+TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER: TypeAlias = Tuple[
+    Text, PayloadParam, TokenData, UserInDB, UserInDB
 ]
 
 
@@ -203,6 +206,70 @@ def get_user_with_required_permissions(required_permissions: List[Permission]):
             pass
 
         return token_payload_data_user
+
+    return get_current_active_user_permissions
+
+
+def get_user_with_required_permissions_managing_target_user(
+    required_permissions: List[Permission],
+):
+    """Check if the current user has the required permissions
+    and is managing the target user."""
+
+    def get_current_active_user_permissions(
+        user_id: Text = QueryPath(..., description="The ID of the user in URL path."),
+        token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
+            get_current_active_user
+        ),
+        db: DatabaseBase = Depends(depend_db),
+    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER:
+        user = token_payload_data_user[3]
+        user_permissions = ROLE_PERMISSIONS[user.role].permissions
+        logger.debug(
+            f"User '{user.username}' with role '{user.role}' "
+            + f"has permissions '{user_permissions}'"
+        )
+
+        # Check if the user is managing the target user
+        target_user = get_user_by_id(db, user_id=user_id, organization_id=None)
+        if target_user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+        if (
+            ROLE_PERMISSIONS[target_user.role].authority_level
+            > ROLE_PERMISSIONS[user.role].authority_level
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+            )
+        token_payload_data_user_target_user = (
+            token_payload_data_user[0],
+            token_payload_data_user[1],
+            token_payload_data_user[2],
+            token_payload_data_user[3],
+            target_user,
+        )
+
+        # Check if the user has the required permissions
+        if Permission.MANAGE_ALL_RESOURCES in user_permissions:
+            return (
+                token_payload_data_user_target_user  # Super Admin has all permissions
+            )
+
+        if not set(required_permissions).issubset(set(user_permissions)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+            )
+
+        # Additional checks for organization-specific permissions
+        if (
+            Permission.MANAGE_ORG_CONTENT in required_permissions
+            or Permission.MANAGE_ORG_USERS in required_permissions
+        ):
+            pass
+
+        return token_payload_data_user_target_user
 
     return get_current_active_user_permissions
 
