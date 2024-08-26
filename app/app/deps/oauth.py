@@ -243,6 +243,28 @@ async def depend_user_of_platform_managing_user(
     )
 
 
+async def depend_user_of_platform_managing_org(
+    org: Organization = Depends(depend_current_org),
+    token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
+        depend_current_active_user
+    ),
+) -> TYPE_TOKEN_PAYLOAD_DATA_USER_ORG:
+    user = token_payload_data_user[3]
+
+    if user.role not in (Role.SUPER_ADMIN, Role.PLATFORM_ADMIN):
+        logger.debug(f"User '{user.username}' is not a platform user")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
+    return (
+        token_payload_data_user[0],
+        token_payload_data_user[1],
+        token_payload_data_user[2],
+        user,
+        org,
+    )
+
+
 async def depend_user_of_org(
     org: Organization = Depends(depend_current_active_org),
     token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
@@ -315,12 +337,16 @@ async def depend_user_of_org_managing_user(
 
 def UserPermissionChecker(
     required_permissions: List[Permission],
-    depends_type: Literal[
-        "platform_user",
-        "platform_user_managing_user",
-        "org_user",
-        "org_user_managing_user",
-    ],
+    depends_type: (
+        Literal[
+            "platform_user",
+            "platform_user_managing_user",
+            "platform_user_managing_org",
+            "org_user",
+            "org_user_managing_user",
+        ]
+        | None
+    ) = None,
 ):
     """Check if the current user has the required permissions."""
 
@@ -353,6 +379,13 @@ def UserPermissionChecker(
         ),
     ) -> TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER:
         return _depend_basic_user_permissions(token_payload_data_user_tar_user)
+
+    def _depend_platform_user_managing_org(
+        token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
+            depend_user_of_platform_managing_org
+        ),
+    ) -> TYPE_TOKEN_PAYLOAD_DATA_USER_ORG:
+        return _depend_basic_user_permissions(token_payload_data_user_org)
 
     def _depend_org_user(
         token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
@@ -390,9 +423,11 @@ def UserPermissionChecker(
         return _depend_platform_user
     elif depends_type == "platform_user_managing_user":
         return _depend_platform_user_managing_user
+    elif depends_type == "platform_user_managing_org":
+        return _depend_platform_user_managing_org
     elif depends_type == "org_user":
         return _depend_org_user
     elif depends_type == "org_user_managing_user":
         return _depend_org_user_managing_user
     else:
-        raise ValueError(f"Invalid depends_type: {depends_type}")
+        return _depend_basic_user_permissions

@@ -5,6 +5,7 @@ from app.db.organizations import (
     create_organization,
     delete_organization,
     list_organizations,
+    retrieve_organization,
     update_organization,
 )
 from app.deps.db import depend_db
@@ -23,6 +24,29 @@ from app.schemas.pagination import Pagination
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 
 router = APIRouter()
+
+
+@router.get(
+    "/organizations/me",
+    dependencies=[Depends(UserPermissionChecker([Permission.USE_ORG_CONTENT]))],
+)
+async def api_retrieve_my_organization(
+    token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER,
+    db: DatabaseBase = Depends(depend_db),
+) -> Organization:
+    """Retrieve the organization of the current user."""
+
+    user = token_payload_data_user[3]
+    if user.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User has no organization"
+        )
+    org = await retrieve_organization(db, organization_id=user.organization_id)
+    if org is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+        )
+    return org
 
 
 @router.get(
@@ -73,7 +97,9 @@ async def api_create_organization(
 @router.get("/organizations/{org_id}")
 async def api_retrieve_organization(
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        UserPermissionChecker([Permission.MANAGE_ORG_CONTENT], "org_user")
+        UserPermissionChecker(
+            [Permission.MANAGE_ORG_CONTENT], "platform_user_managing_org"
+        )
     )
 ) -> Organization:
     """Retrieve an organization by its ID."""
@@ -86,7 +112,9 @@ async def api_retrieve_organization(
 async def api_update_organization(
     organization_update: OrganizationUpdate = Body(...),
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        UserPermissionChecker([Permission.MANAGE_ORG_CONTENT], "platform_user")
+        UserPermissionChecker(
+            [Permission.MANAGE_ORG_CONTENT], "platform_user_managing_org"
+        )
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> Organization:
@@ -106,7 +134,9 @@ async def api_update_organization(
 @router.delete("/organizations/{org_id}")
 async def api_delete_organization(
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        UserPermissionChecker([Permission.MANAGE_ORGANIZATIONS], "platform_user")
+        UserPermissionChecker(
+            [Permission.MANAGE_ORGANIZATIONS], "platform_user_managing_org"
+        )
     ),
     db: DatabaseBase = Depends(depend_db),
 ):
