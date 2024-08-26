@@ -1,6 +1,8 @@
+from typing import Dict, Text
+
 import httpx
 import pytest
-from app.schemas.oauth import Role, User, UserCreate, UserUpdate
+from app.schemas.oauth import Role, Token, User, UserCreate, UserUpdate
 from app.schemas.pagination import Pagination
 from faker import Faker
 from fastapi.testclient import TestClient
@@ -18,12 +20,17 @@ platform_user_2_login_data = LoginData(
 )
 
 
+cache_tokens: Dict[Text, Token] = {}
+
+
 @pytest.mark.asyncio
 async def test_init_platform_status(client: TestClient):
     # Check initial database state
     response = client.get(
         "/platform/users",
-        headers=get_token(client=client, **superuser_login_data).to_headers(),
+        headers=get_token(
+            client=client, **superuser_login_data, cache=cache_tokens
+        ).to_headers(),
     )
     response.raise_for_status()
     user_list_res = Pagination[User].model_validate(response.json())
@@ -46,7 +53,9 @@ async def test_create_platform_users(client: TestClient):
     response = client.post(
         "/platform/users",
         json=new_user_create.model_dump(exclude_none=True),
-        headers=get_token(client=client, **superuser_login_data).to_headers(),
+        headers=get_token(
+            client=client, **superuser_login_data, cache=cache_tokens
+        ).to_headers(),
     )
     response.raise_for_status()
     platform_user = User.model_validate(response.json())
@@ -57,7 +66,9 @@ async def test_create_platform_users(client: TestClient):
     # Check that the new platform user is in the list of platform users
     response = client.get(
         "/platform/users",
-        headers=get_token(client=client, **superuser_login_data).to_headers(),
+        headers=get_token(
+            client=client, **superuser_login_data, cache=cache_tokens
+        ).to_headers(),
     )
     response.raise_for_status()
     user_list_res = Pagination[User].model_validate(response.json())
@@ -67,7 +78,9 @@ async def test_create_platform_users(client: TestClient):
     # Retrieve the new platform user
     response = client.get(
         f"/platform/users/{platform_user.id}",
-        headers=get_token(client=client, **superuser_login_data).to_headers(),
+        headers=get_token(
+            client=client, **superuser_login_data, cache=cache_tokens
+        ).to_headers(),
     )
     response.raise_for_status()
     retrieved_platform_user = User.model_validate(response.json())
@@ -93,7 +106,9 @@ async def test_platform_user_operations(client: TestClient):
     response = client.post(
         "/platform/users",
         json=new_user_2_create.model_dump(exclude_none=True),
-        headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+        headers=get_token(
+            client=client, **platform_user_1_login_data, cache=cache_tokens
+        ).to_headers(),
     )
     response.raise_for_status()
     platform_user_2 = User.model_validate(response.json())
@@ -104,7 +119,9 @@ async def test_platform_user_operations(client: TestClient):
     # Check that the new platform user is in the list of platform users
     response = client.get(
         "/platform/users",
-        headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+        headers=get_token(
+            client=client, **platform_user_1_login_data, cache=cache_tokens
+        ).to_headers(),
     )
     response.raise_for_status()
     user_list_res = Pagination[User].model_validate(response.json())
@@ -116,7 +133,9 @@ async def test_platform_user_operations(client: TestClient):
     response = client.put(
         f"/platform/users/{platform_user_2.id}",
         json=user_update.model_dump(exclude_none=True),
-        headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+        headers=get_token(
+            client=client, **platform_user_1_login_data, cache=cache_tokens
+        ).to_headers(),
     )
     response.raise_for_status()
     updated_platform_user = User.model_validate(response.json())
@@ -126,7 +145,9 @@ async def test_platform_user_operations(client: TestClient):
     # Retrieve the updated platform user
     response = client.get(
         f"/platform/users/{platform_user_2.id}",
-        headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+        headers=get_token(
+            client=client, **platform_user_1_login_data, cache=cache_tokens
+        ).to_headers(),
     )
     response.raise_for_status()
     retrieved_updated_platform_user = User.model_validate(response.json())
@@ -138,12 +159,16 @@ async def test_platform_user_operations(client: TestClient):
     # Delete the new platform user (soft delete)
     response = client.delete(
         f"/platform/users/{platform_user_2.id}",
-        headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+        headers=get_token(
+            client=client, **platform_user_1_login_data, cache=cache_tokens
+        ).to_headers(),
     )
     response.raise_for_status()
     response = client.get(
         f"/platform/users/{platform_user_2.id}",
-        headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+        headers=get_token(
+            client=client, **platform_user_1_login_data, cache=cache_tokens
+        ).to_headers(),
     )
     response.raise_for_status()
     platform_user_2 = User.model_validate(response.json())
@@ -151,7 +176,9 @@ async def test_platform_user_operations(client: TestClient):
     # Check list users filtered disabled
     response = client.get(
         "/platform/users",
-        headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+        headers=get_token(
+            client=client, **platform_user_1_login_data, cache=cache_tokens
+        ).to_headers(),
         params={"disabled": False},
     )
     response.raise_for_status()
@@ -165,7 +192,9 @@ async def test_platform_user_failures(client: TestClient):
     user_me = User.model_validate(
         client.get(
             "/auth/me",
-            headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+            headers=get_token(
+                client=client, **platform_user_1_login_data, cache=cache_tokens
+            ).to_headers(),
         ).json()
     )
 
@@ -174,7 +203,9 @@ async def test_platform_user_failures(client: TestClient):
         response = client.put(
             f"/platform/users/{user_me.id}",
             json={"role": Role.SUPER_ADMIN.value},
-            headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+            headers=get_token(
+                client=client, **platform_user_1_login_data, cache=cache_tokens
+            ).to_headers(),
         )
         response.raise_for_status()
 
@@ -182,13 +213,17 @@ async def test_platform_user_failures(client: TestClient):
     superuser = User.model_validate(
         client.get(
             "/auth/me",
-            headers=get_token(client=client, **superuser_login_data).to_headers(),
+            headers=get_token(
+                client=client, **superuser_login_data, cache=cache_tokens
+            ).to_headers(),
         ).json()
     )
     with pytest.raises(httpx.HTTPStatusError):
         response = client.put(
             f"/platform/users/{superuser.id}",
             json={"role": Role.PLATFORM_ADMIN.value},
-            headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+            headers=get_token(
+                client=client, **platform_user_1_login_data, cache=cache_tokens
+            ).to_headers(),
         )
         response.raise_for_status()
