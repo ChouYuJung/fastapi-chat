@@ -12,7 +12,6 @@ from app.schemas.oauth import (
     Permission,
     Role,
     TokenData,
-    User,
     UserInDB,
 )
 from app.utils.oauth import oauth2_scheme, verify_payload, verify_token
