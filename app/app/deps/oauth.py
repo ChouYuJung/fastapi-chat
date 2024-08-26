@@ -7,6 +7,7 @@ from app.db.tokens import is_token_blocked
 from app.db.users import get_user
 from app.deps.db import depend_db
 from app.schemas.oauth import (
+    ROLE_AUTH_LEVELS,
     ROLE_PERMISSIONS,
     Organization,
     PayloadParam,
@@ -216,21 +217,19 @@ async def depend_user_of_platform_managing_user(
     ),
 ) -> TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER:
     user = token_payload_data_user[3]
-    if user.role in (Role.SUPER_ADMIN, Role.PLATFORM_ADMIN):
-        pass
-    elif target_user.role == Role.SUPER_ADMIN:
+
+    if ROLE_AUTH_LEVELS[target_user.role] > ROLE_AUTH_LEVELS[user.role]:
         logger.debug(
-            f"User '{user.username}' cannot manage Super Admin '{target_user.id}'"
+            f"User '{user.username}' cannot manage user '{target_user.id}' with higher role"
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
         )
-    elif (
-        ROLE_PERMISSIONS[target_user.role].authority_level
-        > ROLE_PERMISSIONS[user.role].authority_level
-    ):
+    elif user.role in (Role.SUPER_ADMIN, Role.PLATFORM_ADMIN):
+        pass
+    elif target_user.role == Role.SUPER_ADMIN:
         logger.debug(
-            f"User '{user.username}' cannot manage user '{target_user.id}' with higher role"
+            f"User '{user.username}' cannot manage Super Admin '{target_user.id}'"
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
@@ -279,7 +278,14 @@ async def depend_user_of_org_managing_user(
     user = token_payload_data_user_org[3]
     org = token_payload_data_user_org[4]
 
-    if user.role in (Role.SUPER_ADMIN, Role.PLATFORM_ADMIN):
+    if ROLE_AUTH_LEVELS[target_user.role] > ROLE_AUTH_LEVELS[user.role]:
+        logger.debug(
+            f"User '{user.username}' cannot manage user '{target_user.id}' with higher role"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
+    elif user.role in (Role.SUPER_ADMIN, Role.PLATFORM_ADMIN):
         pass
     elif user.role == Role.ORG_ADMIN:
         if target_user.organization_id != org.id:
@@ -297,16 +303,6 @@ async def depend_user_of_org_managing_user(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
             )
-    elif (
-        ROLE_PERMISSIONS[target_user.role].authority_level
-        > ROLE_PERMISSIONS[user.role].authority_level
-    ):
-        logger.debug(
-            f"User '{user.username}' cannot manage user '{target_user.id}' with higher role"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
-        )
     return (
         token_payload_data_user_org[0],
         token_payload_data_user_org[1],

@@ -4,7 +4,13 @@ from app.db._base import DatabaseBase
 from app.db.users import create_user, delete_user, list_users, update_user
 from app.deps.db import depend_db
 from app.deps.oauth import TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER, UserPermissionChecker
-from app.schemas.oauth import Permission, PlatformUserCreate, Role, User, UserUpdate
+from app.schemas.oauth import (
+    Permission,
+    PlatformUserCreate,
+    PlatformUserUpdate,
+    Role,
+    User,
+)
 from app.schemas.pagination import Pagination
 from app.utils.common import run_as_coro
 from app.utils.oauth import get_password_hash
@@ -91,7 +97,7 @@ def api_update_platform_user(
             [Permission.MANAGE_PLATFORM], "platform_user_managing_user"
         )
     ),
-    user_update: UserUpdate = Body(...),
+    user_update: PlatformUserUpdate = Body(...),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:
     """Update a platform user."""

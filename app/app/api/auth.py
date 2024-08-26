@@ -6,6 +6,7 @@ from app.db._base import DatabaseBase
 from app.db.tokens import caching_token, invalidate_token, retrieve_cached_token
 from app.deps.db import depend_db
 from app.deps.oauth import (
+    TYPE_TOKEN_PAYLOAD_DATA_USER,
     depend_current_active_token_payload,
     depend_current_active_token_payload_data,
     depend_current_active_user,
@@ -13,7 +14,7 @@ from app.deps.oauth import (
     depend_current_user,
     depend_token_payload,
 )
-from app.schemas.oauth import PayloadParam, RefreshTokenRequest, Token
+from app.schemas.oauth import PayloadParam, RefreshTokenRequest, Token, User
 from app.utils.oauth import (
     authenticate_user,
     create_token_model,
@@ -30,6 +31,17 @@ router = APIRouter()
 
 class RefreshToken(BaseModel):
     refresh_token: Text
+
+
+@router.get("/auth/me")
+async def api_auth_me(
+    token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
+        depend_current_active_user
+    ),
+) -> User:
+    """Retrieve the current user."""
+
+    return token_payload_data_user[3]
 
 
 @router.post("/auth/token", response_model=Token)

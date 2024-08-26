@@ -1,3 +1,4 @@
+import httpx
 import pytest
 from app.schemas.oauth import Role, User, UserCreate, UserUpdate
 from app.schemas.pagination import Pagination
@@ -157,3 +158,37 @@ async def test_platform_user_operations(client: TestClient):
     user_list_res = Pagination[User].model_validate(response.json())
     assert len(user_list_res.data) == 1
     assert not any(user.id == platform_user_2.id for user in user_list_res.data)
+
+
+@pytest.mark.asyncio
+async def test_platform_user_failures(client: TestClient):
+    user_me = User.model_validate(
+        client.get(
+            "/auth/me",
+            headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+        ).json()
+    )
+
+    # Try modify self as platform user
+    with pytest.raises(httpx.HTTPStatusError):
+        response = client.put(
+            f"/platform/users/{user_me.id}",
+            json={"role": Role.SUPER_ADMIN.value},
+            headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+        )
+        response.raise_for_status()
+
+    # Try modify the superuser as platform user
+    superuser = User.model_validate(
+        client.get(
+            "/auth/me",
+            headers=get_token(client=client, **superuser_login_data).to_headers(),
+        ).json()
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        response = client.put(
+            f"/platform/users/{superuser.id}",
+            json={"role": Role.PLATFORM_ADMIN.value},
+            headers=get_token(client=client, **platform_user_1_login_data).to_headers(),
+        )
+        response.raise_for_status()

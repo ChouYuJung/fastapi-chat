@@ -29,9 +29,6 @@ class Permission(str, Enum):
 class RolePermission(BaseModel):
     name: Text
     permissions: List[Permission]
-    authority_level: int = Field(
-        default=0, description="The authority level of the role", ge=0, le=100
-    )
 
 
 class RolePermissionSuperAdmin(RolePermission):
@@ -42,7 +39,6 @@ class RolePermissionSuperAdmin(RolePermission):
         default_factory=lambda: [Permission.MANAGE_ALL_RESOURCES],
         description="Super Admin has all permissions",
     )
-    authority_level: Literal[100] = Field(default=100)
 
 
 class RolePermissionPlatformAdmin(RolePermission):
@@ -69,7 +65,6 @@ class RolePermissionPlatformAdmin(RolePermission):
         ],
         description="Platform Admin has platform-wide permissions",
     )
-    authority_level: Literal[3] = Field(default=3)
 
 
 class RolePermissionOrgAdmin(RolePermission):
@@ -90,7 +85,6 @@ class RolePermissionOrgAdmin(RolePermission):
         ],
         description="Organization Admin has organization-wide permissions",
     )
-    authority_level: Literal[2] = Field(default=2)
 
 
 class RolePermissionOrgUser(RolePermission):
@@ -101,7 +95,6 @@ class RolePermissionOrgUser(RolePermission):
         default_factory=lambda: [Permission.USE_ORG_CONTENT],
         description="Organization could use organization content",
     )
-    authority_level: Literal[1] = Field(default=1)
 
 
 class RolePermissionOrgGuest(RolePermission):
@@ -112,7 +105,6 @@ class RolePermissionOrgGuest(RolePermission):
         default_factory=lambda: [Permission.USE_ORG_CONTENT],
         description="Organization Guest could use organization content",
     )
-    authority_level: Literal[0] = Field(default=0)
 
 
 _ROLE_PERMISSIONS: Dict[Role, RolePermission] = {
@@ -122,6 +114,15 @@ _ROLE_PERMISSIONS: Dict[Role, RolePermission] = {
     Role.ORG_USER: RolePermissionOrgUser(),
 }
 ROLE_PERMISSIONS = MappingProxyType(_ROLE_PERMISSIONS)
+ROLE_AUTH_LEVELS = MappingProxyType(
+    {
+        Role.SUPER_ADMIN: 100,
+        Role.PLATFORM_ADMIN: 3,
+        Role.ORG_ADMIN: 2,
+        Role.ORG_USER: 1,
+        Role.ORG_GUEST: 0,
+    }
+)
 
 
 class Organization(BaseModel):
@@ -239,6 +240,11 @@ class UserCreate(BaseModel):
 class PlatformUserCreate(UserCreate):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     role: Literal[Role.PLATFORM_ADMIN] = Field(default=Role.PLATFORM_ADMIN)
+
+
+class PlatformUserUpdate(UserUpdate):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    role: Optional[Literal[Role.PLATFORM_ADMIN]] = Field(default=None)
 
 
 class UserGuestRegister(UserCreate):
