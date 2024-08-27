@@ -163,7 +163,7 @@ async def depend_querying_user(
 ):
     user = await run_as_coro(db.retrieve_user, user_id=user_id)
     if user is None:
-        logger.debug(f"User '{user_id}' not found")
+        logger.debug(f"Querying user '{user_id}' not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )

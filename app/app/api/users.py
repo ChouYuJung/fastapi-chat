@@ -34,6 +34,65 @@ from fastapi import Query, Response, status
 router = APIRouter()
 
 
+@router.get("/organizations/{org_id}/users/me")
+async def api_get_me(
+    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
+        UserPermissionChecker([Permission.USE_ORG_CONTENT], "org_user")
+    ),
+) -> User:
+    """Retrieve the user profile of the current user."""
+
+    return token_payload_data_user_org[3]
+
+
+@router.put("/organizations/{org_id}/users/me")
+async def api_update_me(
+    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
+        UserPermissionChecker([Permission.USE_ORG_CONTENT], "org_user")
+    ),
+    user_update: UserUpdate = Body(...),
+    db: DatabaseBase = Depends(depend_db),
+) -> User:
+    """Update the user profile of the current user."""
+
+    user = token_payload_data_user_org[3]
+    org = token_payload_data_user_org[4]
+
+    user = update_user(
+        db, organization_id=org.id, user_id=user.id, user_update=user_update
+    )
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    return user
+
+
+@router.delete("/organizations/{org_id}/users/me")
+async def api_delete_me(
+    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
+        UserPermissionChecker([Permission.USE_ORG_CONTENT], "org_user")
+    ),
+    db: DatabaseBase = Depends(depend_db),
+):
+    """Delete the user profile of the current user."""
+
+    user = token_payload_data_user_org[3]
+    org = token_payload_data_user_org[4]
+
+    user = delete_user(
+        db,
+        user_id=user.id,
+        organization_id=org.id,
+        soft_delete=True,
+    )
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post("/organizations/{org_id}/users/register", response_model=Token)
 async def api_register(
     user_guest_register: UserGuestRegister = Body(

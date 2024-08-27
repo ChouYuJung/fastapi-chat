@@ -336,4 +336,86 @@ async def test_org_admin_managing_users(client: TestClient):
 
 @pytest.mark.asyncio
 async def test_org_users_operations(client: TestClient):
-    pass
+    org_1_user = await auth_me(client, org_1_user_login_data, cache_tokens=cache_tokens)
+
+    # Get self
+    user_self = User.model_validate(
+        client.get(
+            f"/organizations/{org_1_user.organization_id}/users/me",
+            headers=get_token(
+                client=client, **org_1_user_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
+    assert user_self
+
+    # Update self
+    user_self_update = UserUpdate.model_validate({"full_name": fake.name()})
+    updated_user_self = User.model_validate(
+        client.put(
+            f"/organizations/{org_1_user.organization_id}/users/me",
+            json=user_self_update.model_dump(exclude_none=True),
+            headers=get_token(
+                client=client, **org_1_user_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
+    assert updated_user_self.full_name == user_self_update.full_name
+
+    # Raise error if user do org admin operations
+    with pytest.raises(httpx.HTTPStatusError):
+        client.get(
+            f"/organizations/{org_1_user.organization_id}/users",
+            headers=get_token(
+                client=client, **org_1_user_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).raise_for_status()
+    with pytest.raises(httpx.HTTPStatusError):
+        client.post(
+            f"/organizations/{org_1_user.organization_id}/users",
+            headers=get_token(
+                client=client, **org_1_user_login_data, cache=cache_tokens
+            ).to_headers(),
+            json=UserCreate.model_validate(
+                {
+                    "username": fake.user_name(),
+                    "email": fake.safe_email(),
+                    "password": fake.password(),
+                    "full_name": fake.name(),
+                    "role": Role.ORG_USER.value,
+                }
+            ).model_dump(exclude_none=True),
+        ).raise_for_status()
+    with pytest.raises(httpx.HTTPStatusError):
+        client.put(
+            f"/organizations/{org_1_user.organization_id}/users/{org_1_user.id}",
+            headers=get_token(
+                client=client, **org_1_user_login_data, cache=cache_tokens
+            ).to_headers(),
+            json=UserUpdate.model_validate({"full_name": fake.name()}).model_dump(
+                exclude_none=True
+            ),
+        ).raise_for_status()
+    with pytest.raises(httpx.HTTPStatusError):
+        client.delete(
+            f"/organizations/{org_1_user.organization_id}/users/{org_1_user.id}",
+            headers=get_token(
+                client=client, **org_1_user_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).raise_for_status()
+
+    # Delete self, then org user should not be able to login
+    client.delete(
+        f"/organizations/{org_1_user.organization_id}/users/me",
+        headers=get_token(
+            client=client, **org_1_user_login_data, cache=cache_tokens
+        ).to_headers(),
+    ).raise_for_status()
+    with pytest.raises(httpx.HTTPStatusError):
+        response = client.get(
+            f"/organizations/{org_1_user.organization_id}/users/me",
+            headers=get_token(
+                client=client, **org_1_user_login_data, cache=cache_tokens
+            ).to_headers(),
+        )
+        response.raise_for_status()
