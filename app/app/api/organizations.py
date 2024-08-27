@@ -13,6 +13,7 @@ from app.deps.oauth import (
     TYPE_TOKEN_PAYLOAD_DATA_USER,
     TYPE_TOKEN_PAYLOAD_DATA_USER_ORG,
     UserPermissionChecker,
+    depend_current_active_user,
 )
 from app.schemas.oauth import (
     Organization,
@@ -26,12 +27,11 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, st
 router = APIRouter()
 
 
-@router.get(
-    "/organizations/me",
-    dependencies=[Depends(UserPermissionChecker([Permission.USE_ORG_CONTENT]))],
-)
+@router.get("/organizations/me")
 async def api_retrieve_my_organization(
-    token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER,
+    token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
+        depend_current_active_user
+    ),
     db: DatabaseBase = Depends(depend_db),
 ) -> Organization:
     """Retrieve the organization of the current user."""

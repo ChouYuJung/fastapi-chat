@@ -156,6 +156,62 @@ async def test_org_admin_create_users(client: TestClient):
     await auth_me(client, org_1_admin_login_data, cache_tokens=cache_tokens)
     await auth_me(client, org_2_admin_login_data, cache_tokens=cache_tokens)
 
+    org_1 = Organization.model_validate(
+        client.get(
+            "/organizations/me",
+            headers=get_token(
+                client=client, **org_1_admin_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
+    org_1_user_create = UserCreate.model_validate(
+        {
+            "username": org_1_user_login_data["username"],
+            "email": fake.safe_email(),
+            "password": org_1_user_login_data["password"],
+            "full_name": fake.name(),
+            "role": Role.ORG_USER.value,
+        }
+    )
+    user_1 = User.model_validate(
+        client.post(
+            f"/organizations/{org_1.id}/users",
+            json=org_1_user_create.model_dump(exclude_none=True),
+            headers=get_token(
+                client=client, **org_1_admin_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
+    assert user_1
+
+    org_2 = Organization.model_validate(
+        client.get(
+            "/organizations/me",
+            headers=get_token(
+                client=client, **org_2_admin_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
+    org_2_user_create = UserCreate.model_validate(
+        {
+            "username": org_2_user_login_data["username"],
+            "email": fake.safe_email(),
+            "password": org_2_user_login_data["password"],
+            "full_name": fake.name(),
+            "role": Role.ORG_USER.value,
+        }
+    )
+    user_2 = User.model_validate(
+        client.post(
+            f"/organizations/{org_2.id}/users",
+            json=org_2_user_create.model_dump(exclude_none=True),
+            headers=get_token(
+                client=client, **org_2_admin_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
+    assert user_2
+
 
 @pytest.mark.asyncio
 async def test_org_admin_managing_users(client: TestClient):
@@ -168,5 +224,5 @@ async def test_org_users_operations(client: TestClient):
 
 
 @pytest.mark.asyncio
-async def test_plateform_users_operations(client: TestClient):
+async def test_platform_users_operations(client: TestClient):
     pass
