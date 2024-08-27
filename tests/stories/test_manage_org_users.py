@@ -9,6 +9,7 @@ from app.schemas.oauth import (
     Token,
     User,
     UserCreate,
+    UserUpdate,
 )
 from app.schemas.pagination import Pagination
 from faker import Faker
@@ -215,14 +216,77 @@ async def test_org_admin_create_users(client: TestClient):
 
 @pytest.mark.asyncio
 async def test_org_admin_managing_users(client: TestClient):
-    pass
+    await auth_me(client, org_1_admin_login_data, cache_tokens=cache_tokens)
+    await auth_me(client, org_2_admin_login_data, cache_tokens=cache_tokens)
+
+    org_1 = Organization.model_validate(
+        client.get(
+            "/organizations/me",
+            headers=get_token(
+                client=client, **org_1_admin_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
+
+    # Get org users
+    users_res = Pagination[User].model_validate(
+        client.get(
+            f"/organizations/{org_1.id}/users",
+            headers=get_token(
+                client=client, **org_1_admin_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
+    assert len(users_res.data) == 2
+    org_user_1 = next(
+        u for u in users_res.data if u.username == org_1_user_login_data["username"]
+    )
+    assert org_user_1
+
+    # Update org user
+    user_1_update = UserUpdate.model_validate({"full_name": fake.name()})
+    updated_user_1 = User.model_validate(
+        client.put(
+            f"/organizations/{org_1.id}/users/{org_user_1.id}",
+            json=user_1_update.model_dump(exclude_none=True),
+            headers=get_token(
+                client=client, **org_1_admin_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
+    assert updated_user_1
+    assert updated_user_1.full_name == user_1_update.full_name
+
+    # Delete org user
+    response = client.delete(
+        f"/organizations/{org_1.id}/users/{org_user_1.id}",
+        headers=get_token(
+            client=client, **org_1_admin_login_data, cache=cache_tokens
+        ).to_headers(),
+    )
+    response.raise_for_status()
+
+    # Check user deleted
+    # Org admin could see the deleted user
+    assert User.model_validate(
+        client.get(
+            f"/organizations/{org_1.id}/users/{org_user_1.id}",
+            headers=get_token(
+                client=client, **org_1_admin_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
+
+    # Recover user
+    client.put(
+        f"/organizations/{org_1.id}/users/{org_user_1.id}",
+        headers=get_token(
+            client=client, **org_1_admin_login_data, cache=cache_tokens
+        ).to_headers(),
+        json={"disabled": False},
+    ).raise_for_status()
 
 
 @pytest.mark.asyncio
 async def test_org_users_operations(client: TestClient):
-    pass
-
-
-@pytest.mark.asyncio
-async def test_platform_users_operations(client: TestClient):
     pass
