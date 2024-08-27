@@ -1,5 +1,6 @@
 from typing import Dict, Text
 
+import httpx
 import pytest
 from app.schemas.oauth import (
     Organization,
@@ -227,6 +228,14 @@ async def test_org_admin_managing_users(client: TestClient):
             ).to_headers(),
         ).json()
     )
+    org_2 = Organization.model_validate(
+        client.get(
+            "/organizations/me",
+            headers=get_token(
+                client=client, **org_2_admin_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).json()
+    )
 
     # Get org users
     users_res = Pagination[User].model_validate(
@@ -238,16 +247,31 @@ async def test_org_admin_managing_users(client: TestClient):
         ).json()
     )
     assert len(users_res.data) == 2
-    org_user_1 = next(
+    org_1_user = next(
         u for u in users_res.data if u.username == org_1_user_login_data["username"]
     )
-    assert org_user_1
+    assert org_1_user
+    org_2_user = next(
+        u
+        for u in Pagination[User]
+        .model_validate(
+            client.get(
+                f"/organizations/{org_2.id}/users",
+                headers=get_token(
+                    client=client, **org_2_admin_login_data, cache=cache_tokens
+                ).to_headers(),
+            ).json()
+        )
+        .data
+        if u.username == org_2_user_login_data["username"]
+    )
+    assert org_2_user
 
     # Update org user
     user_1_update = UserUpdate.model_validate({"full_name": fake.name()})
     updated_user_1 = User.model_validate(
         client.put(
-            f"/organizations/{org_1.id}/users/{org_user_1.id}",
+            f"/organizations/{org_1.id}/users/{org_1_user.id}",
             json=user_1_update.model_dump(exclude_none=True),
             headers=get_token(
                 client=client, **org_1_admin_login_data, cache=cache_tokens
@@ -259,7 +283,7 @@ async def test_org_admin_managing_users(client: TestClient):
 
     # Delete org user
     response = client.delete(
-        f"/organizations/{org_1.id}/users/{org_user_1.id}",
+        f"/organizations/{org_1.id}/users/{org_1_user.id}",
         headers=get_token(
             client=client, **org_1_admin_login_data, cache=cache_tokens
         ).to_headers(),
@@ -270,7 +294,7 @@ async def test_org_admin_managing_users(client: TestClient):
     # Org admin could see the deleted user
     assert User.model_validate(
         client.get(
-            f"/organizations/{org_1.id}/users/{org_user_1.id}",
+            f"/organizations/{org_1.id}/users/{org_1_user.id}",
             headers=get_token(
                 client=client, **org_1_admin_login_data, cache=cache_tokens
             ).to_headers(),
@@ -279,12 +303,35 @@ async def test_org_admin_managing_users(client: TestClient):
 
     # Recover user
     client.put(
-        f"/organizations/{org_1.id}/users/{org_user_1.id}",
+        f"/organizations/{org_1.id}/users/{org_1_user.id}",
         headers=get_token(
             client=client, **org_1_admin_login_data, cache=cache_tokens
         ).to_headers(),
         json={"disabled": False},
     ).raise_for_status()
+
+    # Raise error if user in different org
+    with pytest.raises(httpx.HTTPStatusError):
+        client.get(
+            f"/organizations/{org_2.id}/users/{org_2_user.id}",
+            headers=get_token(
+                client=client, **org_1_admin_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).raise_for_status()
+    with pytest.raises(httpx.HTTPStatusError):
+        client.get(
+            f"/organizations/{org_1.id}/users/{org_2_user.id}",
+            headers=get_token(
+                client=client, **org_1_admin_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).raise_for_status()
+    with pytest.raises(httpx.HTTPStatusError):
+        client.get(
+            f"/organizations/{org_2.id}/users/{org_1_user.id}",
+            headers=get_token(
+                client=client, **org_1_admin_login_data, cache=cache_tokens
+            ).to_headers(),
+        ).raise_for_status()
 
 
 @pytest.mark.asyncio
