@@ -58,7 +58,7 @@ async def api_update_me(
     user = token_payload_data_user_org[3]
     org = token_payload_data_user_org[4]
 
-    user = update_user(
+    user = await update_user(
         db, organization_id=org.id, user_id=user.id, user_update=user_update
     )
     if user is None:
@@ -119,7 +119,7 @@ async def api_register(
     org = token_payload_data_user_org[4]
 
     # Create a new user with the given username and password.
-    created_user = create_user(
+    created_user = await create_user(
         db,
         user_create=user_guest_register,
         hashed_password=get_password_hash(user_guest_register.password),
@@ -141,7 +141,7 @@ async def api_register(
     )
 
     # Save the token to the database.
-    caching_token(db, username=created_user.username, token=token)
+    await caching_token(db, username=created_user.username, token=token)
 
     # Return the access token.
     return token
@@ -164,14 +164,16 @@ async def api_list_users(
     org = token_payload_data_user_org[4]
 
     return Pagination[User].model_validate(
-        list_users(
-            db,
-            organization_id=org.id,
-            disabled=disabled,
-            sort=sort,
-            start=start,
-            before=before,
-            limit=limit,
+        (
+            await list_users(
+                db,
+                organization_id=org.id,
+                disabled=disabled,
+                sort=sort,
+                start=start,
+                before=before,
+                limit=limit,
+            )
         ).model_dump()
     )
 
@@ -202,7 +204,7 @@ async def api_create_user(
 
     org = token_payload_data_user_org[4]
 
-    created_user = create_user(
+    created_user = await create_user(
         db,
         user_create=user_create,
         hashed_password=get_password_hash(user_create.password),
@@ -228,7 +230,7 @@ async def api_retrieve_user(
 
     org = token_payload_data_user_org_tar_user[4]
 
-    user = get_user_by_id(db, organization_id=org.id, user_id=user_id)
+    user = await get_user_by_id(db, organization_id=org.id, user_id=user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -249,7 +251,7 @@ async def api_update_user(
 
     org = token_payload_data_user_org_tar_user[4]
 
-    user = update_user(
+    user = await update_user(
         db, organization_id=org.id, user_id=user_id, user_update=user_update
     )
     if user is None:

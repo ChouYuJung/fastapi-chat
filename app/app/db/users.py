@@ -2,22 +2,25 @@ from typing import TYPE_CHECKING, Literal, Optional, Sequence, Text
 
 from app.schemas.oauth import Role, UserCreate, UserInDB, UserUpdate
 from app.schemas.pagination import Pagination
+from app.utils.common import run_as_coro
 
 if TYPE_CHECKING:
     from app.db._base import DatabaseBase
 
 
-def get_user(db: "DatabaseBase", *, username: Text) -> Optional["UserInDB"]:
-    return db.retrieve_user_by_username(username)
+async def get_user(db: "DatabaseBase", *, username: Text) -> Optional["UserInDB"]:
+    return await run_as_coro(db.retrieve_user_by_username, username)
 
 
-def get_user_by_id(
+async def get_user_by_id(
     db: "DatabaseBase", *, user_id: Text, organization_id: Optional[Text] = None
 ) -> Optional["UserInDB"]:
-    return db.retrieve_user(organization_id=organization_id, user_id=user_id)
+    return await run_as_coro(
+        db.retrieve_user, organization_id=organization_id, user_id=user_id
+    )
 
 
-def list_users(
+async def list_users(
     db: "DatabaseBase",
     *,
     organization_id: Optional[Text] = None,
@@ -31,7 +34,8 @@ def list_users(
 ) -> Pagination[UserInDB]:
     """List users from the database."""
 
-    return db.list_users(
+    return await run_as_coro(
+        db.list_users,
         organization_id=organization_id,
         role=role,
         roles=roles,
@@ -43,7 +47,7 @@ def list_users(
     )
 
 
-def update_user(
+async def update_user(
     db: "DatabaseBase",
     *,
     organization_id: Optional[Text] = None,
@@ -52,12 +56,15 @@ def update_user(
 ) -> Optional[UserInDB]:
     """Update a user in the database."""
 
-    return db.update_user(
-        organization_id=organization_id, user_id=user_id, user_update=user_update
+    return await run_as_coro(
+        db.update_user,
+        organization_id=organization_id,
+        user_id=user_id,
+        user_update=user_update,
     )
 
 
-def create_user(
+async def create_user(
     db: "DatabaseBase",
     *,
     user_create: "UserCreate",
@@ -67,7 +74,8 @@ def create_user(
 ) -> Optional["UserInDB"]:
     """Create a new user in the database."""
 
-    return db.create_user(
+    return await run_as_coro(
+        db.create_user,
         user_create=user_create,
         hashed_password=hashed_password,
         organization_id=organization_id,
@@ -75,7 +83,7 @@ def create_user(
     )
 
 
-def delete_user(
+async def delete_user(
     db: "DatabaseBase",
     user_id: Text,
     *,
@@ -84,6 +92,9 @@ def delete_user(
 ) -> bool:
     """Delete a user from the database."""
 
-    return db.delete_user(
-        user_id=user_id, organization_id=organization_id, soft_delete=soft_delete
+    return await run_as_coro(
+        db.delete_user,
+        user_id=user_id,
+        organization_id=organization_id,
+        soft_delete=soft_delete,
     )

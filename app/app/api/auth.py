@@ -53,7 +53,7 @@ async def api_login(
     """Authenticate a user with the given username and password."""
 
     # Authenticate the user with the given username and password.
-    user = authenticate_user(db, form_data.username, form_data.password)
+    user = await authenticate_user(db, form_data.username, form_data.password)
     if not user:
         logger.debug(f"User '{form_data.username}' failed to authenticate")
         raise HTTPException(
@@ -63,7 +63,7 @@ async def api_login(
         )
 
     # Return if token active
-    token = retrieve_cached_token(db, username=user.username)
+    token = await retrieve_cached_token(db, username=user.username)
     if token is not None and is_token_expired(token.access_token) is False:
         logger.debug(f"User '{form_data.username}' already has a token")
         return token
@@ -82,7 +82,7 @@ async def api_login(
     )
 
     # Save the token to the database.
-    caching_token(db, username=user.username, token=token)
+    await caching_token(db, username=user.username, token=token)
 
     # Return the access token.
     return token
@@ -108,11 +108,11 @@ async def api_logout(
     if not isinstance(username, Text):
         raise credentials_exception
 
-    token = retrieve_cached_token(db, username=username)
+    token = await retrieve_cached_token(db, username=username)
 
     # Logout user and invalidate the token.
     if token is not None:
-        invalidate_token(db, token=token)
+        await invalidate_token(db, token=token)
 
     # Return a response.
     return JSONResponse(
@@ -166,12 +166,12 @@ async def api_refresh_token(
         refresh_token_expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
     # Save the new token to the database
-    caching_token(db, username=user.username, token=token)
+    await caching_token(db, username=user.username, token=token)
 
     # Logout user and invalidate the token.
-    token_old = retrieve_cached_token(db, username=user.username)
+    token_old = await retrieve_cached_token(db, username=user.username)
     if token_old is not None:
-        invalidate_token(db, token=token_old)
+        await invalidate_token(db, token=token_old)
 
     # Return the new access token
     return token

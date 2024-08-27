@@ -27,12 +27,12 @@ def get_password_hash(password: Text | bytes) -> Text:
     return pwd_context.hash(password)
 
 
-def authenticate_user(
+async def authenticate_user(
     db: "DatabaseBase", username: Text, password: Text
 ) -> Optional["UserInDB"]:
     """Authenticate a user with the given username and password."""
 
-    user = get_user(db, username=username)
+    user = await get_user(db, username=username)
     if not user:
         return None
     if not verify_password(password, user.hashed_password):

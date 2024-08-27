@@ -55,13 +55,13 @@ async def api_list_platform_users(
         Depends(UserPermissionChecker([Permission.MANAGE_PLATFORM], "platform_user"))
     ],
 )
-def api_create_platform_user(
+async def api_create_platform_user(
     user_create: PlatformUserCreate = Body(...),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:
     """Create a new platform user."""
 
-    created_user = create_user(
+    created_user = await create_user(
         db,
         user_create=user_create,
         hashed_password=get_password_hash(user_create.password),
@@ -91,7 +91,7 @@ async def api_retrieve_platform_user(
 
 
 @router.put("/platform/users/{user_id}")
-def api_update_platform_user(
+async def api_update_platform_user(
     token_payload_data_user_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER = Depends(
         UserPermissionChecker(
             [Permission.MANAGE_PLATFORM], "platform_user_managing_user"
@@ -103,7 +103,9 @@ def api_update_platform_user(
     """Update a platform user."""
 
     target_user_id = token_payload_data_user_tar_user[4].id
-    updated_user = update_user(db, user_id=target_user_id, user_update=user_update)
+    updated_user = await update_user(
+        db, user_id=target_user_id, user_update=user_update
+    )
     if updated_user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
