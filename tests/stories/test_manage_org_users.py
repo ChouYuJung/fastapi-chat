@@ -14,7 +14,7 @@ from app.schemas.pagination import Pagination
 from faker import Faker
 from fastapi.testclient import TestClient
 
-from tests.utils import LoginData, get_token
+from tests.utils import LoginData, auth_me, get_token
 
 fake = Faker()
 
@@ -149,3 +149,24 @@ async def test_init_platform_status(client: TestClient):
         ).json()
     )
     assert org_2_admin.role == Role.ORG_ADMIN
+
+
+@pytest.mark.asyncio
+async def test_org_admin_create_users(client: TestClient):
+    await auth_me(client, org_1_admin_login_data, cache_tokens=cache_tokens)
+    await auth_me(client, org_2_admin_login_data, cache_tokens=cache_tokens)
+
+
+@pytest.mark.asyncio
+async def test_org_admin_managing_users(client: TestClient):
+    pass
+
+
+@pytest.mark.asyncio
+async def test_org_users_operations(client: TestClient):
+    pass
+
+
+@pytest.mark.asyncio
+async def test_plateform_users_operations(client: TestClient):
+    pass
