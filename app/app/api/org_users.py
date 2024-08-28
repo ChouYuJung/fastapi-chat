@@ -26,6 +26,7 @@ from app.schemas.oauth import (
     UserUpdate,
 )
 from app.schemas.pagination import Pagination
+from app.utils.common import run_as_coro
 from app.utils.oauth import create_token_model, get_password_hash
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi import Path as QueryPath
@@ -80,7 +81,8 @@ async def api_delete_me(
     user = token_payload_data_user_org[3]
     org = token_payload_data_user_org[4]
 
-    user = delete_user(
+    user = await run_as_coro(
+        delete_user,
         db,
         user_id=user.id,
         organization_id=org.id,
@@ -275,7 +277,8 @@ async def api_delete_user(
 
     org = token_payload_data_user_org_tar_user[4]
 
-    user = delete_user(
+    user = await run_as_coro(
+        delete_user,
         db,
         user_id=user_id,
         organization_id=org.id,

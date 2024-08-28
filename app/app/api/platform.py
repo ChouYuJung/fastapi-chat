@@ -114,7 +114,7 @@ async def api_update_platform_user(
 
 
 @router.delete("/platform/users/{user_id}")
-def api_delete_platform_user(
+async def api_delete_platform_user(
     token_payload_data_user_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_TAR_USER = Depends(
         UserPermissionChecker(
             [Permission.MANAGE_PLATFORM], "platform_user_managing_user"
@@ -125,7 +125,8 @@ def api_delete_platform_user(
     """Delete a platform user."""
 
     target_user_id = token_payload_data_user_tar_user[4].id
-    success = delete_user(
+    success = await run_as_coro(
+        delete_user,
         db,
         user_id=target_user_id,
         organization_id=None,

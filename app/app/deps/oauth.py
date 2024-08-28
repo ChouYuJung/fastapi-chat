@@ -85,7 +85,7 @@ async def depend_current_active_token_payload(
 ) -> TYPE_TOKEN_PAYLOAD:
 
     token = token_payload[0]
-    if is_token_blocked(db, token=token):
+    if await run_as_coro(is_token_blocked, db, token=token):
         logger.debug(f"Token '{token}' has been invalidated")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -136,7 +136,7 @@ async def depend_current_user(
     token_data = token_payload_data[2]
 
     # Get user from the database
-    user = get_user(db, username=token_data.username)
+    user = await get_user(db, username=token_data.username)
     if user is None:
         logger.debug(f"User '{token_data.username}' not found")
         raise credentials_exception

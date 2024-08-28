@@ -1,11 +1,11 @@
 from fastapi import APIRouter
 
 from .auth import router as auth_router
-from .organizations import router as organizations_router
-from .platform import router as platform_router
 
 # from .conversations import router as conversations_router
-from .users import router as users_router
+from .org_users import router as users_router
+from .organizations import router as organizations_router
+from .platform import router as platform_router
 
 router = APIRouter()
 
