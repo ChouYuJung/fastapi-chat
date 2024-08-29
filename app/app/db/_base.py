@@ -1,20 +1,9 @@
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Dict,
-    List,
-    Literal,
-    Optional,
-    Sequence,
-    Set,
-    Text,
-)
+from typing import TYPE_CHECKING, Literal, Optional, Sequence, Text
 
 from yarl import URL
 
 if TYPE_CHECKING:
     from app.schemas.conversations import (
-        Conversation,
         ConversationCreate,
         ConversationInDB,
         ConversationUpdate,
