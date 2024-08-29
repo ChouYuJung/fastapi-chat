@@ -1,13 +1,14 @@
 from typing import Annotated, Literal, Optional, Text
 
+from app.db._base import DatabaseBase
 from app.db.conversations import (
     create_conversation,
     delete_conversation,
-    fake_conversations_db,
     list_conversations,
     retrieve_conversation,
     update_conversation,
 )
+from app.deps.db import depend_db
 from app.deps.oauth import TYPE_TOKEN_PAYLOAD_DATA_USER_ORG
 from app.deps.oauth import Permission as Per
 from app.deps.oauth import UserPermissionChecker
@@ -34,6 +35,7 @@ async def api_list_my_conversations(
     token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
         UserPermissionChecker([Per.USE_ORG_CONTENT], "org_user")
     ),
+    db: DatabaseBase = Depends(depend_db),
 ) -> Pagination[Conversation]:
     """List conversations from the database."""
 
@@ -44,7 +46,7 @@ async def api_list_my_conversations(
     return Pagination[Conversation].model_validate(
         (
             await list_conversations(
-                fake_conversations_db,
+                db,
                 participants=[user.id],
                 disabled=disabled,
                 sort=sort,
@@ -62,12 +64,11 @@ async def api_list_my_conversations(
 )
 async def api_create_conversation(
     conversation_create: ConversationCreate,
+    db: DatabaseBase = Depends(depend_db),
 ) -> Conversation:
     """Create a new conversation."""
 
-    conversation = conversation_create.to_conversation()
-    await create_conversation(fake_conversations_db, conversation=conversation)
-    return conversation
+    return await create_conversation(db, conversation_create=conversation_create)
 
 
 @router.get(
@@ -80,13 +81,14 @@ async def api_list_conversations(
     start: Optional[Text] = Query(default=None),
     before: Optional[Text] = Query(default=None),
     limit: Optional[int] = Query(default=20),
+    db: DatabaseBase = Depends(depend_db),
 ) -> Pagination[Conversation]:
     """List conversations from the database."""
 
     return Pagination[Conversation].model_validate(
         (
             await list_conversations(
-                fake_conversations_db,
+                db,
                 disabled=disabled,
                 sort=sort,
                 start=start,
@@ -103,12 +105,11 @@ async def api_list_conversations(
 )
 async def api_get_conversation(
     conversation_id: Annotated[Text, QueryPath(...)],
+    db: DatabaseBase = Depends(depend_db),
 ) -> Conversation:
     """Retrieve a conversation by ID."""
 
-    conversation = await retrieve_conversation(
-        fake_conversations_db, conversation_id=conversation_id
-    )
+    conversation = await retrieve_conversation(db, conversation_id=conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -123,11 +124,12 @@ async def api_get_conversation(
 async def api_update_conversation(
     conversation_id: Annotated[Text, QueryPath(...)],
     conversation_update: ConversationUpdate,
+    db: DatabaseBase = Depends(depend_db),
 ) -> Conversation:
     """Update an existing conversation."""
 
     conversation = await update_conversation(
-        fake_conversations_db,
+        db,
         conversation_id=conversation_id,
         conversation_update=conversation_update,
     )
@@ -143,10 +145,11 @@ async def api_update_conversation(
 async def api_delete_conversation(
     conversation_id: Annotated[Text, QueryPath(...)],
     soft_delete: bool = Query(default=True),
+    db: DatabaseBase = Depends(depend_db),
 ):
     """Delete a conversation"""
 
     await delete_conversation(
-        fake_conversations_db, conversation_id=conversation_id, soft_delete=soft_delete
+        db, conversation_id=conversation_id, soft_delete=soft_delete
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

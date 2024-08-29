@@ -100,7 +100,7 @@ class ConversationUpdate(BaseModel):
     participant_ids: Optional[List[Text]] = Field(default=None)
     disabled: Optional[bool] = Field(default=None)
 
-    def to_conversation(self, conversation: Conversation) -> Conversation:
+    def apply_conversation(self, conversation: Conversation) -> Conversation:
         conversation_date = conversation.model_dump()
         participants_models_old = conversation.participants
 

@@ -2,6 +2,11 @@ from types import MappingProxyType
 from typing import List, Literal, Optional, Sequence, Text, TypedDict
 
 from app.db._base import DatabaseBase
+from app.schemas.conversations import (
+    ConversationCreate,
+    ConversationInDB,
+    ConversationUpdate,
+)
 from app.schemas.oauth import (
     Organization,
     OrganizationCreate,
@@ -18,10 +23,11 @@ from app.schemas.pagination import Pagination
 
 
 class _BD(TypedDict):
-    organizations: List["Organization"]
-    users: List["UserInDB"]
     cached_tokens: List["TokenInDB"]
     blacklisted_tokens: List["TokenBlacklisted"]
+    organizations: List["Organization"]
+    users: List["UserInDB"]
+    conversations: List["ConversationInDB"]
 
 
 class DatabaseMemory(DatabaseBase):
@@ -44,20 +50,21 @@ class DatabaseMemory(DatabaseBase):
     def __init__(self, *arg, **kwargs):
         self._url = None
         self._db = _BD(
+            cached_tokens=[],
+            blacklisted_tokens=[],
             organizations=[],
             users=[
                 UserInDB.model_validate(u)
                 for u in dict(self.fake_super_admin_init).values()
             ],
-            cached_tokens=[],
-            blacklisted_tokens=[],
+            conversations=[],
         )
 
     @property
     def client(self) -> _BD:
         return self._db
 
-    def list_organizations(
+    async def list_organizations(
         self,
         disabled: Optional[bool] = False,
         sort: Literal["asc", "desc"] = "asc",
@@ -95,23 +102,25 @@ class DatabaseMemory(DatabaseBase):
             }
         )
 
-    def retrieve_organization(self, organization_id: Text) -> Optional["Organization"]:
+    async def retrieve_organization(
+        self, organization_id: Text
+    ) -> Optional["Organization"]:
         for org in self._db["organizations"]:
             if org.id == organization_id:
                 return org
         return None
 
-    def create_organization(
+    async def create_organization(
         self, *, organization_create: "OrganizationCreate", owner_id: Text
     ) -> Optional["Organization"]:
         org = organization_create.to_organization(owner_id=owner_id)
         self._db["organizations"].append(org)
         return org
 
-    def update_organization(
+    async def update_organization(
         self, *, organization_id: Text, organization_update: "OrganizationUpdate"
     ) -> Optional["Organization"]:
-        org = self.retrieve_organization(organization_id)
+        org = await self.retrieve_organization(organization_id)
         if org is None:
             return None
         updated_org = organization_update.apply_organization(org)
@@ -121,10 +130,10 @@ class DatabaseMemory(DatabaseBase):
                 break
         return updated_org
 
-    def delete_organization(
+    async def delete_organization(
         self, *, organization_id: Text, soft_delete: bool = True
     ) -> Optional["Organization"]:
-        org = self.retrieve_organization(organization_id)
+        org = await self.retrieve_organization(organization_id)
         if org is None:
             return None
 
@@ -137,7 +146,7 @@ class DatabaseMemory(DatabaseBase):
             ]
             return org
 
-    def retrieve_user(
+    async def retrieve_user(
         self, user_id: Text, *, organization_id: Optional[Text] = None
     ) -> Optional["UserInDB"]:
         for user in self._db["users"]:
@@ -147,7 +156,7 @@ class DatabaseMemory(DatabaseBase):
                 return user
         return None
 
-    def retrieve_user_by_username(
+    async def retrieve_user_by_username(
         self, username: Text, organization_id: Optional[Text] = None
     ) -> Optional["UserInDB"]:
         for user in self._db["users"]:
@@ -157,7 +166,7 @@ class DatabaseMemory(DatabaseBase):
                 return user
         return None
 
-    def list_users(
+    async def list_users(
         self,
         *,
         organization_id: Optional[Text] = None,
@@ -205,14 +214,16 @@ class DatabaseMemory(DatabaseBase):
             }
         )
 
-    def update_user(
+    async def update_user(
         self,
         *,
         organization_id: Optional[Text] = None,
         user_id: Text,
         user_update: "UserUpdate",
     ) -> Optional["UserInDB"]:
-        user = self.retrieve_user(organization_id=organization_id, user_id=user_id)
+        user = await self.retrieve_user(
+            organization_id=organization_id, user_id=user_id
+        )
         if user is None:
             return None
         updated_user = user_update.apply_user(user)
@@ -223,7 +234,7 @@ class DatabaseMemory(DatabaseBase):
                 break
         return updated_user_db
 
-    def create_user(
+    async def create_user(
         self,
         *,
         user_create: "UserCreate",
@@ -241,7 +252,7 @@ class DatabaseMemory(DatabaseBase):
         self._db["users"].append(user_db)
         return user_db
 
-    def delete_user(
+    async def delete_user(
         self,
         user_id: Text,
         *,
@@ -249,7 +260,9 @@ class DatabaseMemory(DatabaseBase):
         soft_delete: bool = True,
     ) -> bool:
         out = True
-        user = self.retrieve_user(organization_id=organization_id, user_id=user_id)
+        user = await self.retrieve_user(
+            organization_id=organization_id, user_id=user_id
+        )
         if user is None:
             return False
         if soft_delete:
@@ -262,7 +275,7 @@ class DatabaseMemory(DatabaseBase):
             user.disabled
         return out
 
-    def retrieve_cached_token(self, username: Text) -> Optional["TokenInDB"]:
+    async def retrieve_cached_token(self, username: Text) -> Optional["TokenInDB"]:
         for token in self._db["cached_tokens"]:
             if token.username == username and not self.is_token_blocked(
                 token.access_token
@@ -270,7 +283,9 @@ class DatabaseMemory(DatabaseBase):
                 return token
         return None
 
-    def caching_token(self, username: Text, token: Token) -> Optional["TokenInDB"]:
+    async def caching_token(
+        self, username: Text, token: Token
+    ) -> Optional["TokenInDB"]:
         token_db = self.retrieve_cached_token(username)
         if token_db:
             return None
@@ -278,7 +293,7 @@ class DatabaseMemory(DatabaseBase):
         self._db["cached_tokens"].append(token_db)
         return token_db
 
-    def invalidate_token(self, token: Optional["Token"]):
+    async def invalidate_token(self, token: Optional["Token"]):
         if token is None:
             return
         self._db["blacklisted_tokens"].append(
@@ -288,8 +303,141 @@ class DatabaseMemory(DatabaseBase):
             TokenBlacklisted.model_validate({"token": token.refresh_token})
         )
 
-    def is_token_blocked(self, token: Text) -> bool:
+    async def is_token_blocked(self, token: Text) -> bool:
         for blacklisted_token in self._db["blacklisted_tokens"]:
             if blacklisted_token.token == token:
                 return True
         return False
+
+    async def create_conversation(
+        self, *, conversation_create: "ConversationCreate"
+    ) -> "ConversationInDB":
+        """Create a new conversation in the database."""
+
+        conversation = conversation_create.to_conversation()
+        conversation = ConversationInDB.model_validate(conversation)
+
+        # Validate conversation data
+        if any(c.id == conversation.id for c in self._db["conversations"]):
+            raise ValueError("Conversation already exists")
+
+        self._db["conversations"].append(conversation)
+        return conversation
+
+    async def list_conversations(
+        self,
+        *,
+        participants: Optional[Sequence[Text]] = None,
+        disabled: Optional[bool] = None,
+        sort: Literal["asc", "desc", 1, -1] = "asc",
+        start: Optional[Text] = None,
+        before: Optional[Text] = None,
+        limit: Optional[int] = 20,
+    ) -> Pagination[ConversationInDB]:
+        """List conversations from the database."""
+
+        limit = min(limit or 1000, 1000)
+        conversations = self._db["conversations"]
+        if participants is not None:
+            conversations = [
+                conversation
+                for conversation in conversations
+                if set(participants) <= set(conversation.participants)
+            ]
+        if disabled is not None:
+            conversations = [
+                conversation
+                for conversation in conversations
+                if conversation.disabled == disabled
+            ]
+        if sort in ("asc", 1):
+            conversations = sorted(
+                conversations, key=lambda conversation: conversation.id
+            )
+        else:
+            conversations = sorted(
+                conversations, key=lambda conversation: conversation.id, reverse=True
+            )
+        if start:
+            conversations = [
+                conversation
+                for conversation in conversations
+                if (
+                    conversation.id >= start
+                    if sort in ("asc", 1)
+                    else conversation.id <= start
+                )
+            ]
+        if before:
+            conversations = [
+                conversation
+                for conversation in conversations
+                if (
+                    conversation.id < before
+                    if sort in ("asc", 1)
+                    else conversation.id > before
+                )
+            ]
+        return Pagination[ConversationInDB].model_validate(
+            {
+                "object": "list",
+                "data": conversations[:limit],
+                "first_id": conversations[0].id if conversations else None,
+                "last_id": conversations[-1].id if conversations else None,
+                "has_more": len(conversations) > limit,
+            }
+        )
+
+    async def retrieve_conversation(
+        self,
+        *,
+        conversation_id: Text,
+    ) -> Optional["ConversationInDB"]:
+        """Retrieve a conversation from the database."""
+
+        for conversation in self._db["conversations"]:
+            if conversation.id == conversation_id:
+                return conversation
+        return None
+
+    async def update_conversation(
+        self,
+        *,
+        conversation_id: Text,
+        conversation_update: "ConversationUpdate",
+    ) -> Optional["ConversationInDB"]:
+        """Update a conversation in the database."""
+
+        conversation = await self.retrieve_conversation(conversation_id=conversation_id)
+        if conversation is None:
+            return None
+        conversation = conversation_update.apply_conversation(conversation)
+        conversation = ConversationInDB.model_validate(conversation.model_dump())
+        for i, c in enumerate(self._db["conversations"]):
+            if c.id == conversation_id:
+                self._db["conversations"][i] = conversation
+                break
+        return conversation
+
+    async def delete_conversation(
+        self,
+        *,
+        conversation_id: Text,
+        soft_delete: bool = True,
+    ) -> None:
+        """Delete a conversation from the database."""
+
+        if soft_delete:
+            conversation = await self.retrieve_conversation(
+                conversation_id=conversation_id
+            )
+            if conversation is not None:
+                conversation.disabled = True
+                for i, c in enumerate(self._db["conversations"]):
+                    if c.id == conversation_id:
+                        self._db["conversations"][i] = conversation
+                        break
+        else:
+            self._db["conversations"] = [
+                c for c in self._db["conversations"] if c.id != conversation_id
+            ]

@@ -1,8 +1,24 @@
-from typing import TYPE_CHECKING, Literal, Optional, Sequence, Text
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Set,
+    Text,
+)
 
 from yarl import URL
 
 if TYPE_CHECKING:
+    from app.schemas.conversations import (
+        Conversation,
+        ConversationCreate,
+        ConversationInDB,
+        ConversationUpdate,
+    )
     from app.schemas.oauth import (
         Organization,
         OrganizationCreate,
@@ -54,10 +70,10 @@ class DatabaseBase:
     def client(self):
         raise NotImplementedError
 
-    def touch(self):
+    async def touch(self):
         pass
 
-    def list_organizations(
+    async def list_organizations(
         self,
         disabled: Optional[bool] = False,
         sort: Literal["asc", "desc"] = "asc",
@@ -67,35 +83,37 @@ class DatabaseBase:
     ) -> "Pagination[Organization]":
         raise NotImplementedError
 
-    def retrieve_organization(self, organization_id: Text) -> Optional["Organization"]:
+    async def retrieve_organization(
+        self, organization_id: Text
+    ) -> Optional["Organization"]:
         raise NotImplementedError
 
-    def create_organization(
+    async def create_organization(
         self, *, organization_create: "OrganizationCreate", owner_id: Text
     ) -> Optional["Organization"]:
         raise NotImplementedError
 
-    def update_organization(
+    async def update_organization(
         self, *, organization_id: Text, organization_update: "OrganizationUpdate"
     ) -> Optional["Organization"]:
         raise NotImplementedError
 
-    def delete_organization(
+    async def delete_organization(
         self, *, organization_id: Text, soft_delete: bool = True
     ) -> Optional["Organization"]:
         raise NotImplementedError
 
-    def retrieve_user(
+    async def retrieve_user(
         self, user_id: Text, *, organization_id: Optional[Text] = None
     ) -> Optional["UserInDB"]:
         raise NotImplementedError
 
-    def retrieve_user_by_username(
+    async def retrieve_user_by_username(
         self, username: Text, organization_id: Optional[Text] = None
     ) -> Optional["UserInDB"]:
         raise NotImplementedError
 
-    def list_users(
+    async def list_users(
         self,
         *,
         organization_id: Optional[Text] = None,
@@ -109,7 +127,7 @@ class DatabaseBase:
     ) -> "Pagination[UserInDB]":
         raise NotImplementedError
 
-    def update_user(
+    async def update_user(
         self,
         *,
         organization_id: Optional[Text] = None,
@@ -118,7 +136,7 @@ class DatabaseBase:
     ) -> Optional["UserInDB"]:
         raise NotImplementedError
 
-    def create_user(
+    async def create_user(
         self,
         *,
         user_create: "UserCreate",
@@ -128,7 +146,7 @@ class DatabaseBase:
     ) -> Optional["UserInDB"]:
         raise NotImplementedError
 
-    def delete_user(
+    async def delete_user(
         self,
         user_id: Text,
         *,
@@ -137,16 +155,50 @@ class DatabaseBase:
     ) -> bool:
         raise NotImplementedError
 
-    def retrieve_cached_token(self, username: Text) -> Optional["TokenInDB"]:
+    async def retrieve_cached_token(self, username: Text) -> Optional["TokenInDB"]:
         raise NotImplementedError
 
-    def caching_token(self, username: Text, token: "Token") -> Optional["TokenInDB"]:
+    async def caching_token(
+        self, username: Text, token: "Token"
+    ) -> Optional["TokenInDB"]:
         raise NotImplementedError
 
-    def invalidate_token(self, token: Optional["Token"]):
+    async def invalidate_token(self, token: Optional["Token"]):
         raise NotImplementedError
 
-    def is_token_blocked(self, token: Text) -> bool:
+    async def is_token_blocked(self, token: Text) -> bool:
+        raise NotImplementedError
+
+    async def create_conversation(
+        self, *, conversation_create: "ConversationCreate"
+    ) -> "ConversationInDB":
+        raise NotImplementedError
+
+    async def list_conversations(
+        self,
+        *,
+        participants: Optional[Sequence[Text]] = None,
+        disabled: Optional[bool] = None,
+        sort: Literal["asc", "desc", 1, -1] = "asc",
+        start: Optional[Text] = None,
+        before: Optional[Text] = None,
+        limit: Optional[int] = 20,
+    ) -> "Pagination[ConversationInDB]":
+        raise NotImplementedError
+
+    async def retrieve_conversation(
+        self, *, conversation_id: Text
+    ) -> Optional["ConversationInDB"]:
+        raise NotImplementedError
+
+    async def update_conversation(
+        self, *, conversation_id: Text, conversation_update: "ConversationUpdate"
+    ) -> Optional["ConversationInDB"]:
+        raise NotImplementedError
+
+    async def delete_conversation(
+        self, *, conversation_id: Text, soft_delete: bool = True
+    ) -> None:
         raise NotImplementedError
 
     def __str__(self) -> Text:

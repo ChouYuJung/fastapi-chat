@@ -5,7 +5,7 @@ from typing import Any, Text
 from app.config import logger, settings
 from app.deps.oauth import UserPermissionChecker
 from app.schemas.oauth import Permission
-from app.utils.common import is_json_serializable
+from app.utils.common import is_json_serializable, run_as_coro
 from fastapi import Depends, FastAPI, Request
 
 
@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
 
     _db = DatabaseBase.from_url(settings.DB_URL)
     logger.info(f"Connected to database: {_db}")
-    _db.touch()
+    await run_as_coro(_db.touch)
     set_app_state(app, key="db", value=_db)
     # </SET_DB>
     # </SET_APP_STATE>
