@@ -1,4 +1,4 @@
-from typing import Annotated, Dict, List, Literal, Optional, Set, Text
+from typing import Annotated, Dict, List, Literal, Optional, Sequence, Set, Text
 
 from app.schemas.conversations import Conversation, ConversationInDB, ConversationUpdate
 from app.schemas.pagination import Pagination
@@ -11,7 +11,7 @@ fake_user_conversations_db: Annotated[
 ] = {}
 
 
-def create_conversation(
+async def create_conversation(
     db=fake_conversations_db,
     user_db=fake_user_conversations_db,
     *,
@@ -35,9 +35,10 @@ def create_conversation(
     return conversation
 
 
-def list_conversations(
+async def list_conversations(
     db=fake_conversations_db,
     *,
+    participants: Optional[Sequence[Text]] = None,
     disabled: Optional[bool] = None,
     sort: Literal["asc", "desc", 1, -1] = "asc",
     start: Optional[Text] = None,
@@ -50,6 +51,12 @@ def list_conversations(
     conversations = [
         ConversationInDB.model_validate(conversation) for conversation in db.values()
     ]
+    if participants is not None:
+        conversations = [
+            conversation
+            for conversation in conversations
+            if set(participants) <= set(conversation.participants)
+        ]
     if disabled is not None:
         conversations = [
             conversation
@@ -93,7 +100,7 @@ def list_conversations(
     )
 
 
-def retrieve_conversation(
+async def retrieve_conversation(
     db=fake_conversations_db,
     *,
     conversation_id: Text,
@@ -103,7 +110,7 @@ def retrieve_conversation(
     return db.get(conversation_id)
 
 
-def update_conversation(
+async def update_conversation(
     db=fake_conversations_db,
     *,
     conversation_id: Text,
@@ -111,7 +118,7 @@ def update_conversation(
 ) -> Optional["ConversationInDB"]:
     """Update a conversation in the database."""
 
-    conversation = retrieve_conversation(db, conversation_id=conversation_id)
+    conversation = await retrieve_conversation(db, conversation_id=conversation_id)
     if conversation is None:
         return None
     conversation = conversation_update.to_conversation(conversation)
@@ -120,7 +127,7 @@ def update_conversation(
     return conversation
 
 
-def delete_conversation(
+async def delete_conversation(
     db=fake_conversations_db,
     *,
     conversation_id: Text,
@@ -129,7 +136,7 @@ def delete_conversation(
     """Delete a conversation from the database."""
 
     if soft_delete:
-        conversation = retrieve_conversation(db, conversation_id=conversation_id)
+        conversation = await retrieve_conversation(db, conversation_id=conversation_id)
         if conversation is not None:
             conversation.disabled = True
             db[conversation_id] = conversation
@@ -137,7 +144,7 @@ def delete_conversation(
         db.pop(conversation_id, None)
 
 
-def list_user_conversations(
+async def list_user_conversations(
     db=fake_user_conversations_db,
     *,
     user_id: Text,
