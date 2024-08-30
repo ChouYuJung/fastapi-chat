@@ -67,12 +67,21 @@ class TokenData(BaseModel):
     username: Text
     user_id: Text
     organization_id: Optional[Text] = Field(default=None)
+    disabled: bool = Field(default=False)
 
     @classmethod
     def from_payload(cls, payload: Dict) -> "TokenData":
-        return TokenData.model_validate({"username": payload.get("sub")})
+        data = {"username": payload.get("sub"), "user_id": payload.get("user_id")}
+        if payload.get("organization_id") is not None:
+            data["organization_id"] = payload["organization_id"]
+        if payload.get("disabled") is not None:
+            data["disabled"] = payload["disabled"]
+        return TokenData.model_validate(data)
 
 
 class PayloadParam(TypedDict, total=False):
     sub: Required[Annotated[Text, "subject or username"]]
     exp: Required[Annotated[int, "expiration time in seconds"]]
+    user_id: Required[Annotated[Text, "user ID"]]
+    organization_id: Optional[Annotated[Text, "organization ID"]]
+    disabled: Optional[Annotated[bool, "user disabled status"]]

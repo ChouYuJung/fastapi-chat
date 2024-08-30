@@ -4,6 +4,7 @@ import functools
 import json
 import platform
 from datetime import date, datetime
+from enum import Enum
 from typing import (
     Any,
     Awaitable,
@@ -11,6 +12,7 @@ from typing import (
     Dict,
     Optional,
     ParamSpec,
+    Text,
     TypeVar,
     Union,
     cast,
@@ -112,6 +114,23 @@ async def run_as_coro(
 
     output = cast(T, output)
     return output
+
+
+def str_enum_value(obj: Union[Enum, Text]) -> Text:
+    """Get the value of an Enum or return the input string."""
+
+    if isinstance(obj, Enum):
+        return obj.value
+
+    return obj
+
+
+def str_strip_or_none(obj: Optional[Text]) -> Optional[Text]:
+    """Strip the string or return None."""
+
+    if obj is not None:
+        return obj.strip()
+    return None
 
 
 class DateTimeEncoder(json.JSONEncoder):

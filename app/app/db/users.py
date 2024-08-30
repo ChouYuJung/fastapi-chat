@@ -1,8 +1,10 @@
 from typing import TYPE_CHECKING, Literal, Optional, Sequence, Text
 
-from app.schemas.oauth import Role, UserCreate, UserInDB, UserUpdate
 from app.schemas.pagination import Pagination
 from app.utils.common import run_as_coro
+
+from ..schemas.roles import Role
+from ..schemas.users import UserCreate, UserInDB, UserUpdate
 
 if TYPE_CHECKING:
     from app.db._base import DatabaseBase

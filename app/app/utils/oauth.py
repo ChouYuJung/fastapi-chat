@@ -106,11 +106,23 @@ def verify_payload(payload: Dict) -> Optional[PayloadParam]:
 
     subject = payload.get("sub")
     expires = payload.get("exp")
+    user_id = payload.get("user_id")
+    organization_id = payload.get("organization_id")
+    disabled = payload.get("disabled")
+
     if not isinstance(subject, Text):
         return None
     if not isinstance(expires, int):
         return None
-    return PayloadParam(sub=subject, exp=expires)
+    if not isinstance(user_id, Text):
+        return None
+    return PayloadParam(
+        sub=subject,
+        exp=expires,
+        user_id=user_id,
+        organization_id=organization_id,
+        disabled=disabled,
+    )
 
 
 def is_token_expired(token_or_payload: Text | Dict | PayloadParam) -> bool:

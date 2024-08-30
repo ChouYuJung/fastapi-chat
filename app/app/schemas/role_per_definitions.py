@@ -3,6 +3,7 @@ from typing import Literal, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..utils.common import str_enum_value
 from .permissions import Permission
 from .roles import Role
 
@@ -55,8 +56,7 @@ class RolePermissionsBase(BaseModel):
         self, required_permissions: Sequence["Permission"]
     ) -> bool:
         return all(
-            getattr(self, per.value if isinstance(per, Enum) else str(per), False)
-            for per in required_permissions
+            getattr(self, str_enum_value(per), False) for per in required_permissions
         )
 
 
