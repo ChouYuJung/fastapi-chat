@@ -2,12 +2,14 @@ import time
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Dict, Optional, Text
 
-from app.config import settings
-from app.db.users import get_user
-from app.schemas.oauth import PayloadParam, Token, UserInDB
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+
+from ..config import settings
+from ..db.users import get_user
+from ..schemas.oauth import PayloadParam, Token
+from ..schemas.users import UserInDB
 
 if TYPE_CHECKING:
     from app.db._base import DatabaseBase
