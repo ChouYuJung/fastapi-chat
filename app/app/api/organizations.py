@@ -1,28 +1,29 @@
 from typing import Literal, Optional, Text
 
-from app.db._base import DatabaseBase
-from app.db.organizations import (
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
+
+from ..db._base import DatabaseBase
+from ..db.organizations import (
     create_organization,
     delete_organization,
     list_organizations,
     retrieve_organization,
     update_organization,
 )
-from app.deps.db import depend_db
-from app.deps.oauth import (
+from ..deps.db import depend_db
+from ..deps.oauth import (
     TYPE_TOKEN_PAYLOAD_DATA_USER,
     TYPE_TOKEN_PAYLOAD_DATA_USER_ORG,
     UserPermissionChecker,
     depend_current_active_user,
 )
-from app.schemas.oauth import (
+from ..schemas.oauth import (
     Organization,
     OrganizationCreate,
     OrganizationUpdate,
     Permission,
 )
-from app.schemas.pagination import Pagination
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
+from ..schemas.pagination import Pagination
 
 router = APIRouter()
 

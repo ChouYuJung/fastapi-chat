@@ -1,23 +1,21 @@
 from datetime import timedelta
 from typing import Literal, Optional, Text
 
-from app.config import settings
-from app.db._base import DatabaseBase
-from app.db.tokens import caching_token
-from app.db.users import (
-    create_user,
-    delete_user,
-    get_user_by_id,
-    list_users,
-    update_user,
-)
-from app.deps.db import depend_db
-from app.deps.oauth import (
+from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import Path as QueryPath
+from fastapi import Query, Response, status
+
+from ..config import settings
+from ..db._base import DatabaseBase
+from ..db.tokens import caching_token
+from ..db.users import create_user, delete_user, get_user_by_id, list_users, update_user
+from ..deps.db import depend_db
+from ..deps.oauth import (
     TYPE_TOKEN_PAYLOAD_DATA_USER_ORG,
     TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER,
     UserPermissionChecker,
 )
-from app.schemas.oauth import (
+from ..schemas.oauth import (
     Permission,
     Token,
     User,
@@ -25,12 +23,9 @@ from app.schemas.oauth import (
     UserGuestRegister,
     UserUpdate,
 )
-from app.schemas.pagination import Pagination
-from app.utils.common import run_as_coro
-from app.utils.oauth import create_token_model, get_password_hash
-from fastapi import APIRouter, Body, Depends, HTTPException
-from fastapi import Path as QueryPath
-from fastapi import Query, Response, status
+from ..schemas.pagination import Pagination
+from ..utils.common import run_as_coro
+from ..utils.oauth import create_token_model, get_password_hash
 
 router = APIRouter()
 
