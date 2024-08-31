@@ -1,26 +1,25 @@
 import time
-from enum import Enum
-from typing import Annotated, Dict, List, Text, TypeVar
+from typing import Annotated, Dict, List, Literal, Text, TypeVar
 
-from app.config import logger
-from app.db._base import DatabaseBase
-from app.db.tokens import is_token_blocked
-from app.db.users import get_user
-from app.deps.db import depend_db
-from app.schemas.oauth import TokenData
-from app.utils.common import run_as_coro
-from app.utils.oauth import oauth2_scheme, verify_payload, verify_token
 from fastapi import Depends, HTTPException
 from fastapi import Path as QueryPath
 from fastapi import status
 from pydantic import BaseModel
 from pydantic_core import ValidationError
 
+from ..config import logger
+from ..db._base import DatabaseBase
+from ..db.tokens import is_token_blocked
+from ..db.users import get_user
+from ..deps.db import depend_db
+from ..schemas.oauth import TokenData
 from ..schemas.organizations import Organization
 from ..schemas.permissions import Permission
 from ..schemas.role_per_definitions import get_role_permissions
 from ..schemas.roles import Role
 from ..schemas.users import UserInDB
+from ..utils.common import run_as_coro
+from ..utils.oauth import oauth2_scheme, verify_payload, verify_token
 
 T = TypeVar("T")
 
@@ -369,33 +368,46 @@ async def depends_org_user_managing(
     )
 
 
-class DependsUserPermissionsFunctions(Enum):
-    DEPENDS_CURRENT_USER = depends_current_user
-    DEPENDS_ACTIVE_USER = depends_active_user
-    DEPENDS_PATH_USER_ID = depends_path_user_id
-    DEPENDS_CURRENT_PATH_ORG_ID = depends_current_path_org_id
-    DEPENDS_ACTIVE_PATH_ORG_ID = depends_active_path_org_id
-    DEPENDS_PLATFORM_USER = depends_platform_user
-    DEPENDS_USER_MANAGING = depends_user_managing
-    DEPENDS_ORG_MANAGING = depends_org_managing
-    DEPENDS_ORG_USER_MANAGING = depends_org_user_managing
-
-
-async def DependsUserPermissions(
+def DependsUserPermissions(
     required_permissions: List[Permission],
-    depends_payload: DependsUserPermissionsFunctions,
+    depends_on: (
+        Literal[
+            "depends_active_path_org_id",
+            "depends_active_user",
+            "depends_current_path_org_id",
+            "depends_current_user",
+            "depends_org_managing",
+            "depends_org_user_managing",
+            "depends_path_user_id",
+            "depends_platform_user",
+            "depends_user_managing",
+        ]
+        | None
+    ) = None,
 ):
     """Check if the current user has the required permissions."""
 
     depends_payload_func = None
-    if depends_payload is not None:
-        depends_payload_func = (
-            depends_payload.value
-            if isinstance(depends_payload, Enum)
-            else depends_payload
-        )
+    if depends_on == "depends_active_path_org_id":
+        depends_payload_func = depends_active_path_org_id
+    elif depends_on == "depends_active_user":
+        depends_payload_func = depends_active_user
+    elif depends_on == "depends_current_path_org_id":
+        depends_payload_func = depends_current_path_org_id
+    elif depends_on == "depends_current_user":
+        depends_payload_func = depends_current_user
+    elif depends_on == "depends_org_managing":
+        depends_payload_func = depends_org_managing
+    elif depends_on == "depends_org_user_managing":
+        depends_payload_func = depends_org_user_managing
+    elif depends_on == "depends_path_user_id":
+        depends_payload_func = depends_path_user_id
+    elif depends_on == "depends_platform_user":
+        depends_payload_func = depends_platform_user
+    elif depends_on == "depends_user_managing":
+        depends_payload_func = depends_user_managing
 
-    async def _depends(token_payload: T = Depends(depends_payload_func)) -> T:
+    async def check_permissions(token_payload: T = Depends(depends_payload_func)) -> T:
         if hasattr(token_payload, "user") is False:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -412,14 +424,14 @@ async def DependsUserPermissions(
 
         # Check if the user has the required permissions
         if user_permissions.manage_all_resources is True:
-            pass  # Super Admin has all permissions
+            return token_payload  # Super Admin has all permissions
 
         # Check if the user has the required permissions
-        elif user_permissions.is_permission_granted(required_permissions) is False:
+        if user_permissions.is_permission_granted(required_permissions) is False:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
             )
 
         return token_payload
 
-    return _depends
+    return check_permissions

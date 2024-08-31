@@ -8,14 +8,14 @@ if TYPE_CHECKING:
         ConversationInDB,
         ConversationUpdate,
     )
-    from app.schemas.oauth import Token, TokenInDB
-    from app.schemas.pagination import Pagination
 
+    from ..schemas.oauth import Token, TokenInDB
     from ..schemas.organizations import (
         Organization,
         OrganizationCreate,
         OrganizationUpdate,
     )
+    from ..schemas.pagination import Pagination
     from ..schemas.roles import Role
     from ..schemas.users import UserCreate, UserInDB, UserUpdate
 

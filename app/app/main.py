@@ -2,11 +2,13 @@ import json
 from contextlib import asynccontextmanager
 from typing import Any, Text
 
-from app.config import logger, settings
-from app.deps.oauth import UserPermissionChecker
-from app.schemas.oauth import Permission
-from app.utils.common import is_json_serializable, run_as_coro
 from fastapi import Depends, FastAPI, Request
+
+from .config import logger, settings
+from .deps.oauth import DependsUserPermissions, TokenUserDepends, depends_active_user
+from .schemas.permissions import Permission
+from .schemas.users import User
+from .utils.common import is_json_serializable, run_as_coro
 
 
 @asynccontextmanager
@@ -48,8 +50,8 @@ def create_app():
         "/echo",
         dependencies=[
             Depends(
-                UserPermissionChecker(
-                    [Permission.MANAGE_ALL_RESOURCES], depends_type="platform_user"
+                DependsUserPermissions(
+                    [Permission.MANAGE_ALL_RESOURCES], "depends_active_user"
                 )
             )
         ],
@@ -65,6 +67,14 @@ def create_app():
             "headers": dict(request.headers),
             "cookies": request.cookies,
         }
+
+    @app.get("/auth/me")
+    async def api_me(
+        token_payload_user: TokenUserDepends = Depends(depends_active_user),
+    ) -> User:
+        """Retrieve the current user."""
+
+        return token_payload_user.user
 
     from .api._router import router as api_router
 

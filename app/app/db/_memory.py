@@ -1,25 +1,17 @@
 from types import MappingProxyType
 from typing import List, Literal, Optional, Sequence, Text, TypedDict
 
-from app.db._base import DatabaseBase
-from app.schemas.conversations import (
+from ..db._base import DatabaseBase
+from ..schemas.conversations import (
     ConversationCreate,
     ConversationInDB,
     ConversationUpdate,
 )
-from app.schemas.oauth import (
-    Organization,
-    OrganizationCreate,
-    OrganizationUpdate,
-    Role,
-    Token,
-    TokenBlacklisted,
-    TokenInDB,
-    UserCreate,
-    UserInDB,
-    UserUpdate,
-)
-from app.schemas.pagination import Pagination
+from ..schemas.oauth import Token, TokenBlacklisted, TokenInDB
+from ..schemas.organizations import Organization, OrganizationCreate, OrganizationUpdate
+from ..schemas.pagination import Pagination
+from ..schemas.roles import Role
+from ..schemas.users import UserCreate, UserInDB, UserUpdate
 
 
 class _BD(TypedDict):

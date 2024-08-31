@@ -1,30 +1,31 @@
 from datetime import timedelta
-from typing import Annotated, Text, Tuple
+from typing import Annotated, Text
 
-from app.config import logger, settings
-from app.db._base import DatabaseBase
-from app.db.tokens import caching_token, invalidate_token, retrieve_cached_token
-from app.deps.db import depend_db
-from app.deps.oauth import (
-    TYPE_TOKEN_PAYLOAD_DATA_USER,
-    depend_current_active_token_payload,
-    depend_current_active_token_payload_data,
-    depend_current_active_user,
-    depend_current_token_payload,
-    depend_current_user,
-    depend_token_payload,
+from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
+
+from ..config import logger, settings
+from ..db._base import DatabaseBase
+from ..db.tokens import caching_token, invalidate_token, retrieve_cached_token
+from ..deps.db import depend_db
+from ..deps.oauth import (
+    TokenPayloadDepends,
+    depends_active_token_payload,
+    depends_active_user,
+    depends_current_token_payload,
+    depends_current_user,
+    depends_token_data,
+    depends_token_payload,
 )
-from app.schemas.oauth import PayloadParam, RefreshTokenRequest, Token, User
-from app.utils.oauth import (
+from ..schemas.oauth import RefreshTokenRequest, Token
+from ..utils.oauth import (
     authenticate_user,
     create_token_model,
     is_token_expired,
     validate_client,
 )
-from fastapi import APIRouter, Body, Depends, HTTPException, status
-from fastapi.responses import JSONResponse
-from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -33,17 +34,7 @@ class RefreshToken(BaseModel):
     refresh_token: Text
 
 
-@router.get("/auth/me")
-async def api_auth_me(
-    token_payload_data_user: TYPE_TOKEN_PAYLOAD_DATA_USER = Depends(
-        depend_current_active_user
-    ),
-) -> User:
-    """Retrieve the current user."""
-
-    return token_payload_data_user[3]
-
-
+@router.post("/token", response_model=Token)
 @router.post("/auth/token", response_model=Token)
 @router.post("/auth/login", response_model=Token)
 async def api_login(
@@ -91,7 +82,7 @@ async def api_login(
 @router.post("/auth/logout")
 async def api_logout(
     token_payload: Annotated[
-        Tuple[Text, PayloadParam], Depends(depend_current_active_token_payload)
+        TokenPayloadDepends, Depends(depends_active_token_payload)
     ],
     db: DatabaseBase = Depends(depend_db),
 ):
@@ -103,7 +94,7 @@ async def api_logout(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    payload = token_payload[1]
+    payload = token_payload.payload
     username = payload.get("sub")
     if not isinstance(username, Text):
         raise credentials_exception
@@ -145,17 +136,17 @@ async def api_refresh_token(
         raise HTTPException(status_code=401, detail="Invalid client credentials")
 
     # Validate the user from refresh token and payload
-    token_payload = await depend_current_active_token_payload(
-        await depend_current_token_payload(
-            await depend_token_payload(form_data.refresh_token)
+    token_payload = await depends_active_token_payload(
+        await depends_current_token_payload(
+            await depends_token_payload(form_data.refresh_token)
         ),
         db=db,
     )
-    token_payload_data = await depend_current_active_token_payload_data(token_payload)
-    token_payload_data_user = await depend_current_active_user(
-        await depend_current_user(token_payload_data, db=db)
+    token_payload_data = await depends_token_data(token_payload)
+    token_payload_user = await depends_active_user(
+        await depends_current_user(token_payload_data, db=db)
     )
-    user = token_payload_data_user[3]
+    user = token_payload_user.user
 
     # Create a new access token for the user
     token = create_token_model(
