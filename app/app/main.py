@@ -68,7 +68,7 @@ def create_app():
             "cookies": request.cookies,
         }
 
-    @app.get("/auth/me")
+    @app.get("/me")
     async def api_me(
         token_payload_user: TokenUserDepends = Depends(depends_active_user),
     ) -> User:

@@ -1,10 +1,11 @@
 import time
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Dict, Optional, Text
+from typing import TYPE_CHECKING, Dict, Optional, Text, Union
 
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from pydantic import BaseModel
 
 from ..config import settings
 from ..db.users import get_user
@@ -68,7 +69,7 @@ def create_token(
 
 
 def create_token_model(
-    data: Dict,
+    data: Union[BaseModel, Dict],
     access_token_expires_delta: Optional[timedelta] = None,
     refresh_token_expires_delta: Optional[timedelta] = None,
     key: Text = settings.SECRET_KEY,
@@ -76,15 +77,21 @@ def create_token_model(
 ) -> Token:
     """Create an access token and a refresh token with the given data."""
 
+    data_dict = data.model_dump() if isinstance(data, BaseModel) else data
     expires_at_dt = datetime.now(UTC) + (
         access_token_expires_delta
         if access_token_expires_delta
         else timedelta(minutes=15)
     )
     expires_at = int(expires_at_dt.timestamp())
-    access_token = create_token(data, expire=expires_at, key=key, algorithm=algorithm)
+    access_token = create_token(
+        data_dict, expire=expires_at, key=key, algorithm=algorithm
+    )
     refresh_token = create_token(
-        data, expires_delta=refresh_token_expires_delta, key=key, algorithm=algorithm
+        data_dict,
+        expires_delta=refresh_token_expires_delta,
+        key=key,
+        algorithm=algorithm,
     )
     return Token.from_bearer_token(
         access_token=access_token, refresh_token=refresh_token, expires_at=expires_at
