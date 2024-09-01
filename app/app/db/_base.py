@@ -62,6 +62,8 @@ class DatabaseBase:
 
     async def list_organizations(
         self,
+        organization_id: Optional[Text] = None,
+        organization_ids: Optional[Sequence[Text]] = None,
         disabled: Optional[bool] = False,
         sort: Literal["asc", "desc"] = "asc",
         start: Optional[Text] = None,

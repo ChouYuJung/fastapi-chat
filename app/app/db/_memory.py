@@ -58,6 +58,8 @@ class DatabaseMemory(DatabaseBase):
 
     async def list_organizations(
         self,
+        organization_id: Optional[Text] = None,
+        organization_ids: Optional[Sequence[Text]] = None,
         disabled: Optional[bool] = False,
         sort: Literal["asc", "desc"] = "asc",
         start: Optional[Text] = None,
@@ -66,6 +68,10 @@ class DatabaseMemory(DatabaseBase):
     ) -> "Pagination[Organization]":
         limit = min(limit or 1000, 1000)
         organizations = self._db["organizations"]
+        if organization_id is not None:
+            organizations = [org for org in organizations if org.id == organization_id]
+        if organization_ids is not None:
+            organizations = [org for org in organizations if org.id in organization_ids]
         if disabled is not None:
             organizations = [org for org in organizations if org.disabled == disabled]
         if sort in ("asc", 1):

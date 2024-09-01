@@ -36,6 +36,11 @@ class RolePermissionsBase(BaseModel):
     read_platform_user: bool
     update_platform_user: bool
     delete_platform_user: bool
+    # Organizations management
+    create_org: bool
+    read_org: bool
+    update_org: bool
+    delete_org: bool
     # Organization content
     create_org_content: bool
     read_org_content: bool
@@ -67,6 +72,10 @@ class PrisonerPermissions(RolePermissionsBase):
     read_platform_content: Literal[False] = Field(default=False)
     update_platform_content: Literal[False] = Field(default=False)
     delete_platform_content: Literal[False] = Field(default=False)
+    create_org: Literal[False] = Field(default=False)
+    read_org: Literal[False] = Field(default=False)
+    update_org: Literal[False] = Field(default=False)
+    delete_org: Literal[False] = Field(default=False)
     create_platform_user: Literal[False] = Field(default=False)
     read_platform_user: Literal[False] = Field(default=False)
     update_platform_user: Literal[False] = Field(default=False)
@@ -94,6 +103,7 @@ class OrgViewerPermissions(OrgClientPermissions):
     role: Literal[Role.ORG_VIEWER] = Field(default=Role.ORG_VIEWER)
     auth_level: Literal[2] = Field(default=2)
     read_org_content: Literal[True] = Field(default=True)
+    read_org: Literal[True] = Field(default=True)
 
 
 class OrgEditorPermissions(OrgViewerPermissions):
@@ -111,6 +121,10 @@ class OrgAdminPermissions(OrgEditorPermissions):
     read_org_user: Literal[True] = Field(default=True)
     update_org_user: Literal[True] = Field(default=True)
     delete_org_user: Literal[True] = Field(default=True)
+    create_org: Literal[True] = Field(default=True)
+    read_org: Literal[True] = Field(default=True)
+    update_org: Literal[True] = Field(default=True)
+    delete_org: Literal[True] = Field(default=True)
 
 
 class PlatformViewerPermissions(PrisonerPermissions):
@@ -118,6 +132,7 @@ class PlatformViewerPermissions(PrisonerPermissions):
     auth_level: Literal[5] = Field(default=5)
     read_platform_content: Literal[True] = Field(default=True)
     read_platform_user: Literal[True] = Field(default=True)
+    read_org: Literal[True] = Field(default=True)
     forbidden: Literal[False] = Field(default=False)
 
 
@@ -140,6 +155,10 @@ class PlatformAdminPermissions(PlatformEditorPermissions):
     read_org_user: Literal[True] = Field(default=True)
     update_org_user: Literal[True] = Field(default=True)
     delete_org_user: Literal[True] = Field(default=True)
+    create_org: Literal[True] = Field(default=True)
+    read_org: Literal[True] = Field(default=True)
+    update_org: Literal[True] = Field(default=True)
+    delete_org: Literal[True] = Field(default=True)
 
 
 class SuperAdminPermissions(PlatformAdminPermissions):

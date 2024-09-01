@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal, Optional, Text
+from typing import TYPE_CHECKING, Literal, Optional, Sequence, Text
 
 from app.schemas.oauth import Organization, OrganizationCreate, OrganizationUpdate
 from app.schemas.pagination import Pagination
@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 async def list_organizations(
     db: "DatabaseBase",
     *,
+    organization_id: Optional[Text] = None,
+    organization_ids: Optional[Sequence[Text]] = None,
     disabled: Optional[bool] = False,
     sort: Literal["asc", "desc"] = "asc",
     start: Optional[Text] = None,
@@ -19,6 +21,8 @@ async def list_organizations(
 ) -> Pagination[Organization]:
     return await run_as_coro(
         db.list_organizations,
+        organization_id=organization_id,
+        organization_ids=organization_ids,
         disabled=disabled,
         sort=sort,
         start=start,

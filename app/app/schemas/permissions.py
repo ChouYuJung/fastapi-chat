@@ -13,6 +13,11 @@ class Permission(str, Enum):
     READ_PLATFORM_USER = "read_platform_user"
     UPDATE_PLATFORM_USER = "update_platform_user"
     DELETE_PLATFORM_USER = "delete_platform_user"
+    # Organizations management
+    CREATE_ORG = "create_org"
+    READ_ORG = "read_org"
+    UPDATE_ORG = "update_org"
+    DELETE_ORG = "delete_org"
     # Organization content
     CREATE_ORG_CONTENT = "create_org_content"
     READ_ORG_CONTENT = "read_org_content"
