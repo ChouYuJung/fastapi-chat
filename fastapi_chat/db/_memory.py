@@ -275,7 +275,7 @@ class DatabaseMemory(DatabaseBase):
 
     async def retrieve_cached_token(self, username: Text) -> Optional["TokenInDB"]:
         for token in self._db["cached_tokens"]:
-            if token.username == username and not self.is_token_blocked(
+            if token.username == username and not await self.is_token_blocked(
                 token.access_token
             ):
                 return token
@@ -294,6 +294,10 @@ class DatabaseMemory(DatabaseBase):
     async def invalidate_token(self, token: Optional["Token"]):
         if token is None:
             return
+        for i, t in enumerate(self._db["cached_tokens"]):
+            if t.md5() == token.md5():
+                self._db["cached_tokens"].pop(i)
+                break
         self._db["blacklisted_tokens"].append(
             TokenBlacklisted.model_validate({"token": token.access_token})
         )

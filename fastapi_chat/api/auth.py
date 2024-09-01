@@ -34,9 +34,9 @@ class RefreshToken(BaseModel):
     refresh_token: Text
 
 
-@router.post("/token", response_model=Token)
-@router.post("/auth/token", response_model=Token)
 @router.post("/auth/login", response_model=Token)
+@router.post("/auth/token", response_model=Token)
+@router.post("/token", response_model=Token)
 async def api_login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: DatabaseBase = Depends(depend_db),
@@ -118,6 +118,8 @@ async def api_logout(
 
 
 @router.post("/auth/refresh-token", response_model=Token)
+@router.post("/auth/token/refresh", response_model=Token)
+@router.post("/auth/refresh", response_model=Token)
 async def api_refresh_token(
     form_data: RefreshTokenRequest = Body(...),
     db: DatabaseBase = Depends(depend_db),
@@ -149,21 +151,27 @@ async def api_refresh_token(
     )
     user = token_payload_user.user
 
+    # Logout user and invalidate the token.
+    token_old = await retrieve_cached_token(db, username=user.username)
+    if token_old is not None:
+        await invalidate_token(db, token=token_old)
+
     # Create a new access token for the user
     token = create_token_model(
-        data={"sub": user.username, "role": user.role},
+        data={
+            "sub": user.username,
+            "user_id": user.id,
+            "organization_id": user.organization_id,
+            "disabled": user.disabled,
+        },
         access_token_expires_delta=timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         ),
         refresh_token_expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
+    print(f"Created new token: {token.to_headers()}")
     # Save the new token to the database
     await caching_token(db, username=user.username, token=token)
-
-    # Logout user and invalidate the token.
-    token_old = await retrieve_cached_token(db, username=user.username)
-    if token_old is not None:
-        await invalidate_token(db, token=token_old)
 
     # Return the new access token
     return token
