@@ -14,7 +14,7 @@ services:
     networks:
       - fastapi-chat-network
     volumes:
-      - ./app:/app
+      - ./fastapi_chat:/fastapi_chat
     tty: true
 networks:
   fastapi-chat-network:

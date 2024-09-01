@@ -8,10 +8,13 @@ import pytz
 from colorama import Fore, Style, init
 from pydantic import Field
 from pydantic_settings import BaseSettings
+from rich.console import Console
 
 from .version import VERSION
 
 init(autoreset=True)
+
+console = Console()
 
 
 class Settings(BaseSettings):

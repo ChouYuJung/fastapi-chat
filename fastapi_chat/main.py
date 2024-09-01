@@ -3,8 +3,11 @@ from contextlib import asynccontextmanager
 from typing import Any, Text
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.routing import APIRoute
+from rich.table import Table
+from starlette.routing import Route as StarletteRoute
 
-from .config import logger, settings
+from .config import console, logger, settings
 from .deps.oauth import DependsUserPermissions, TokenUserDepends, depends_active_user
 from .schemas.permissions import Permission
 from .schemas.users import User
@@ -80,13 +83,43 @@ def create_app():
 
     app.include_router(api_router)
 
-    print(app.routes)
+    pretty_print_routes(app)
     return app
 
 
 def set_app_state(app: FastAPI, *, key: Text, value: Any):
     setattr(app.state, key, value)
     app.extra[key] = value
+
+
+def pretty_print_routes(app: FastAPI):
+    """Pretty print the FastAPI routes."""
+
+    table = Table(title="FastAPI Routes")
+
+    table.add_column("Methods", style="cyan")
+    table.add_column("Path", style="magenta")
+    table.add_column("Name", style="green")
+
+    routes = sorted(
+        app.routes,
+        key=lambda x: (
+            "HEAD" not in getattr(x, "methods", list()),
+            getattr(x, "path", ""),
+        ),
+    )
+    routes = [r for r in routes if isinstance(r, (APIRoute, StarletteRoute))]
+    for route in routes:
+        methods = (
+            ", ".join(route.methods)
+            if hasattr(route, "methods") and route.methods
+            else "N/A"
+        )
+        path = route.path
+        name = route.name
+        table.add_row(methods, path, name)
+
+    console.print(table)
 
 
 app = create_app()
