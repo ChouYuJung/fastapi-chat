@@ -122,7 +122,7 @@ async def api_update_platform_user(
             ),
         )
 
-    target_user_id = token_payload_user_managing.user.id
+    target_user_id = token_payload_user_managing.target_user.id
     updated_user = await update_user(
         db, user_id=target_user_id, user_update=user_update
     )
@@ -156,7 +156,7 @@ async def api_delete_platform_user(
             ),
         )
 
-    target_user_id = token_payload_user_managing.user.id
+    target_user_id = token_payload_user_managing.target_user.id
     success = await run_as_coro(
         delete_user,
         db,

@@ -177,7 +177,7 @@ async def depends_active_user(
     current_user = token_payload_user.user
     if current_user.disabled:
         logger.debug(f"User '{current_user.username}' is inactive")
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=403, detail="Inactive user")
     return token_payload_user
 
 
@@ -419,7 +419,7 @@ def DependsUserPermissions(
         user_permissions = get_role_permissions(user.role)
         logger.debug(
             f"User '{user.username}' with role '{user.role}' "
-            + f"has permissions '{user_permissions}'"
+            + f"has permissions '{user_permissions.has_permissions_str()}'"
         )
 
         # Check if the user has the required permissions

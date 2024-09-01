@@ -1,4 +1,4 @@
-from typing import Literal, Sequence
+from typing import Literal, Sequence, Text
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -62,6 +62,9 @@ class RolePermissionsBase(BaseModel):
         return all(
             getattr(self, str_enum_value(per), False) for per in required_permissions
         )
+
+    def has_permissions_str(self) -> Text:
+        return ", ".join([k for k, v in self.model_dump().items() if v is True])
 
 
 class PrisonerPermissions(RolePermissionsBase):

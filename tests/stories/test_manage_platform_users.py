@@ -26,6 +26,7 @@ async def test_create_platform_admin(
     client: TestClient, user_super_admin: LoginData, user_platform_admin: LoginData
 ):
     token = login(client, **user_super_admin.model_dump())
+    assert get_me(client, token).role == Role.SUPER_ADMIN
 
     # Create the first new platform user by superuser
     new_user_create = PlatformUserCreate.model_validate(
@@ -76,6 +77,7 @@ async def test_platform_admin_create_users(
     user_platform_viewer: LoginData,
 ):
     token = login(client, **user_platform_admin.model_dump())
+    assert get_me(client, token).role == Role.PLATFORM_ADMIN
 
     # Create another platform users
     platform_editor_create = PlatformUserCreate.model_validate(
@@ -130,6 +132,7 @@ async def test_platform_admin_update_users(
     client: TestClient, user_platform_admin: LoginData, user_platform_viewer: LoginData
 ):
     token = login(client, **user_platform_admin.model_dump())
+    assert get_me(client, token).role == Role.PLATFORM_ADMIN
 
     # Update the platform editor
     platform_update = PlatformUserUpdate.model_validate(
@@ -156,6 +159,7 @@ async def test_platform_admin_delete_users(
     client: TestClient, user_platform_admin: LoginData, user_platform_viewer: LoginData
 ):
     token = login(client, **user_platform_admin.model_dump())
+    assert get_me(client, token).role == Role.PLATFORM_ADMIN
 
     # Delete the platform viewer
     response = client.delete(
