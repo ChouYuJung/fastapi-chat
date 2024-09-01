@@ -284,7 +284,7 @@ class DatabaseMemory(DatabaseBase):
     async def caching_token(
         self, username: Text, token: Token
     ) -> Optional["TokenInDB"]:
-        token_db = self.retrieve_cached_token(username)
+        token_db = await self.retrieve_cached_token(username)
         if token_db:
             return None
         token_db = token.to_db_model(username=username)
