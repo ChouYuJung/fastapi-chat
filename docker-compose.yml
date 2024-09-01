@@ -9,12 +9,13 @@ services:
       dockerfile: Dockerfile
     environment:
       - DB_URL=${DB_URL}
+      - COLUMNS=120
     ports:
       - "8880:80"
     networks:
       - fastapi-chat-network
     volumes:
-      - ./fastapi_chat:/fastapi_chat
+      - ./fastapi_chat:/app/fastapi_chat
     tty: true
 networks:
   fastapi-chat-network:

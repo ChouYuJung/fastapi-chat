@@ -95,7 +95,7 @@ def set_app_state(app: FastAPI, *, key: Text, value: Any):
 def pretty_print_routes(app: FastAPI):
     """Pretty print the FastAPI routes."""
 
-    table = Table(title="FastAPI Routes")
+    table = Table(title="FastAPI Routes", width=88)
 
     table.add_column("Methods", style="cyan")
     table.add_column("Path", style="magenta")
@@ -103,10 +103,7 @@ def pretty_print_routes(app: FastAPI):
 
     routes = sorted(
         app.routes,
-        key=lambda x: (
-            "HEAD" not in getattr(x, "methods", list()),
-            getattr(x, "path", ""),
-        ),
+        key=lambda x: "HEAD" not in getattr(x, "methods", list()),
     )
     routes = [r for r in routes if isinstance(r, (APIRoute, StarletteRoute))]
     for route in routes:
