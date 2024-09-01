@@ -387,7 +387,7 @@ def DependsUserPermissions(
 ):
     """Check if the current user has the required permissions."""
 
-    depends_payload_func = None
+    depends_payload_func = depends_active_user
     if depends_on == "depends_active_path_org_id":
         depends_payload_func = depends_active_path_org_id
     elif depends_on == "depends_active_user":
