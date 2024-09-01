@@ -244,7 +244,7 @@ class DatabaseMemory(DatabaseBase):
             organization_id=organization_id,
             allow_org_empty=allow_org_empty,
         )
-        if self.retrieve_user_by_username(user.username):
+        if await self.retrieve_user_by_username(user.username):
             return None
         user_db = user.to_db_model(hashed_password=hashed_password)
         self._db["users"].append(user_db)

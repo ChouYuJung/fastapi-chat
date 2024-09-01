@@ -21,7 +21,7 @@ def login(
     return token
 
 
-async def get_headers(
+def get_headers(
     client: TestClient,
     auth: Union["Token", "LoginData", Dict[Text, Text]],
 ) -> Dict[Text, Text]:
@@ -36,7 +36,7 @@ async def get_headers(
     return headers
 
 
-async def get_me(
+def get_me(
     client: TestClient,
     auth: Union["Token", "LoginData", Dict[Text, Text]],
 ) -> "User":

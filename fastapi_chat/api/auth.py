@@ -169,7 +169,6 @@ async def api_refresh_token(
         ),
         refresh_token_expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
-    print(f"Created new token: {token.to_headers()}")
     # Save the new token to the database
     await caching_token(db, username=user.username, token=token)
 
