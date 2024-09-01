@@ -7,87 +7,23 @@ from fastapi import Query, Response, status
 
 from ..config import settings
 from ..db._base import DatabaseBase
+from ..db.organizations import retrieve_organization
 from ..db.tokens import caching_token
 from ..db.users import create_user, delete_user, get_user_by_id, list_users, update_user
 from ..deps.db import depend_db
 from ..deps.oauth import (
-    TYPE_TOKEN_PAYLOAD_DATA_USER_ORG,
-    TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER,
-    UserPermissionChecker,
+    DependsUserPermissions,
+    TokenOrgDepends,
+    TokenOrgUserManagingDepends,
 )
-from ..schemas.oauth import (
-    Permission,
-    Token,
-    User,
-    UserCreate,
-    UserGuestRegister,
-    UserUpdate,
-)
+from ..schemas.oauth import Token
 from ..schemas.pagination import Pagination
+from ..schemas.permissions import Permission
+from ..schemas.users import User, UserCreate, UserGuestRegister, UserUpdate
 from ..utils.common import run_as_coro
 from ..utils.oauth import create_token_model, get_password_hash
 
 router = APIRouter()
-
-
-@router.get("/organizations/{org_id}/users/me")
-async def api_get_me(
-    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        UserPermissionChecker([Permission.USE_ORG_CONTENT], "org_user")
-    ),
-) -> User:
-    """Retrieve the user profile of the current user."""
-
-    return token_payload_data_user_org[3]
-
-
-@router.put("/organizations/{org_id}/users/me")
-async def api_update_me(
-    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        UserPermissionChecker([Permission.USE_ORG_CONTENT], "org_user")
-    ),
-    user_update: UserUpdate = Body(...),
-    db: DatabaseBase = Depends(depend_db),
-) -> User:
-    """Update the user profile of the current user."""
-
-    user = token_payload_data_user_org[3]
-    org = token_payload_data_user_org[4]
-
-    user = await update_user(
-        db, organization_id=org.id, user_id=user.id, user_update=user_update
-    )
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
-    return user
-
-
-@router.delete("/organizations/{org_id}/users/me")
-async def api_delete_me(
-    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        UserPermissionChecker([Permission.USE_ORG_CONTENT], "org_user")
-    ),
-    db: DatabaseBase = Depends(depend_db),
-):
-    """Delete the user profile of the current user."""
-
-    user = token_payload_data_user_org[3]
-    org = token_payload_data_user_org[4]
-
-    user = await run_as_coro(
-        delete_user,
-        db,
-        user_id=user.id,
-        organization_id=org.id,
-        soft_delete=True,
-    )
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/organizations/{org_id}/users/register", response_model=Token)
@@ -106,14 +42,16 @@ async def api_register(
             },
         },
     ),
-    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        UserPermissionChecker([Permission.MANAGE_ORG_USERS], "org_user")
-    ),
+    org_id: Text = QueryPath(..., min_length=4, max_length=64),
     db: DatabaseBase = Depends(depend_db),
 ) -> Token:
     """Register a new user with the given username and password."""
 
-    org = token_payload_data_user_org[4]
+    org = await retrieve_organization(db, organization_id=org_id)
+    if org is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+        )
 
     # Create a new user with the given username and password.
     created_user = await create_user(
@@ -151,14 +89,14 @@ async def api_list_users(
     start: Optional[Text] = Query(None),
     before: Optional[Text] = Query(None),
     limit: Optional[int] = Query(10, ge=1, le=100),
-    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        UserPermissionChecker([Permission.MANAGE_ORG_USERS], "org_user")
+    token_payload_org: TokenOrgDepends = Depends(
+        DependsUserPermissions([Permission.READ_ORG_USER], "depends_org_managing")
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> Pagination[User]:
     """Search for users by username or other criteria."""
 
-    org = token_payload_data_user_org[4]
+    org = token_payload_org.organization
 
     return Pagination[User].model_validate(
         (
@@ -192,14 +130,14 @@ async def api_create_user(
             }
         },
     ),
-    token_payload_data_user_org: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG = Depends(
-        UserPermissionChecker([Permission.MANAGE_ORG_USERS], "org_user")
+    token_payload_org: TokenOrgDepends = Depends(
+        DependsUserPermissions([Permission.CREATE_ORG_USER], "depends_org_managing")
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:
     """Create a new user."""
 
-    org = token_payload_data_user_org[4]
+    org = token_payload_org.organization
 
     created_user = await create_user(
         db,
@@ -217,17 +155,18 @@ async def api_create_user(
 
 @router.get("/organizations/{org_id}/users/{user_id}")
 async def api_retrieve_user(
-    user_id: Text = QueryPath(..., min_length=4, max_length=64),
-    token_payload_data_user_org_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER = Depends(
-        UserPermissionChecker([Permission.MANAGE_ORG_USERS], "org_user_managing_user")
+    token_payload_org_user: TokenOrgUserManagingDepends = Depends(
+        DependsUserPermissions([Permission.READ_ORG_USER], "depends_org_user_managing")
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:
     """Retrieve user profile information."""
 
-    org = token_payload_data_user_org_tar_user[4]
-
-    user = await get_user_by_id(db, organization_id=org.id, user_id=user_id)
+    user = await get_user_by_id(
+        db,
+        organization_id=token_payload_org_user.organization.id,
+        user_id=token_payload_org_user.target_user.id,
+    )
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -237,19 +176,21 @@ async def api_retrieve_user(
 
 @router.put("/organizations/{org_id}/users/{user_id}")
 async def api_update_user(
-    user_id: Text,
     user_update: UserUpdate = Body(...),
-    token_payload_data_user_org_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER = Depends(
-        UserPermissionChecker([Permission.MANAGE_ORG_USERS], "org_user_managing_user")
+    token_payload_org_user: TokenOrgUserManagingDepends = Depends(
+        DependsUserPermissions(
+            [Permission.UPDATE_ORG_USER], "depends_org_user_managing"
+        )
     ),
     db: DatabaseBase = Depends(depend_db),
 ) -> User:
     """Update user profile information."""
 
-    org = token_payload_data_user_org_tar_user[4]
-
     user = await update_user(
-        db, organization_id=org.id, user_id=user_id, user_update=user_update
+        db,
+        organization_id=token_payload_org_user.organization.id,
+        user_id=token_payload_org_user.target_user.id,
+        user_update=user_update,
     )
     if user is None:
         raise HTTPException(
@@ -262,21 +203,20 @@ async def api_update_user(
     "/organizations/{org_id}/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT
 )
 async def api_delete_user(
-    user_id: Text,
-    token_payload_data_user_org_tar_user: TYPE_TOKEN_PAYLOAD_DATA_USER_ORG_TAR_USER = Depends(
-        UserPermissionChecker([Permission.MANAGE_ORG_USERS], "org_user_managing_user")
+    token_payload_org_user: TokenOrgUserManagingDepends = Depends(
+        DependsUserPermissions(
+            [Permission.UPDATE_ORG_USER], "depends_org_user_managing"
+        )
     ),
     db: DatabaseBase = Depends(depend_db),
 ):
     """Delete a user."""
 
-    org = token_payload_data_user_org_tar_user[4]
-
     user = await run_as_coro(
         delete_user,
         db,
-        user_id=user_id,
-        organization_id=org.id,
+        user_id=token_payload_org_user.target_user.id,
+        organization_id=token_payload_org_user.organization.id,
         soft_delete=True,
     )
     if user is None:

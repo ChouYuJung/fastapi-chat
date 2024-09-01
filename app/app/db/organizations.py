@@ -1,6 +1,10 @@
 from typing import TYPE_CHECKING, Literal, Optional, Sequence, Text
 
-from app.schemas.oauth import Organization, OrganizationCreate, OrganizationUpdate
+from app.schemas.organizations import (
+    Organization,
+    OrganizationCreate,
+    OrganizationUpdate,
+)
 from app.schemas.pagination import Pagination
 from app.utils.common import run_as_coro
 
