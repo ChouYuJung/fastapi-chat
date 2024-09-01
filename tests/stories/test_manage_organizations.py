@@ -2,7 +2,10 @@ from typing import Dict, Text
 
 import httpx
 import pytest
-from app.schemas.oauth import (
+from faker import Faker
+from fastapi.testclient import TestClient
+
+from fastapi_chat.schemas.oauth import (
     Organization,
     OrganizationCreate,
     OrganizationUpdate,
@@ -12,10 +15,7 @@ from app.schemas.oauth import (
     User,
     UserCreate,
 )
-from app.schemas.pagination import Pagination
-from faker import Faker
-from fastapi.testclient import TestClient
-
+from fastapi_chat.schemas.pagination import Pagination
 from tests.utils import LoginData, auth_me, get_token
 
 fake = Faker()

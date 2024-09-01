@@ -13,7 +13,7 @@ from ..schemas.oauth import PayloadParam, Token
 from ..schemas.users import UserInDB
 
 if TYPE_CHECKING:
-    from app.db._base import DatabaseBase
+    from fastapi_chat.db._base import DatabaseBase
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

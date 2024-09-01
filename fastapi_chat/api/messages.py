@@ -1,17 +1,18 @@
 from typing import Literal, Optional, Text
 
-from app.db.messages import (
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Response
+
+from fastapi_chat.db.messages import (
     create_message,
     delete_message,
     list_messages,
     retrieve_message,
     update_message,
 )
-from app.deps.oauth import RoleChecker
-from app.schemas.messages import Message, MessageCreate, MessageUpdate
-from app.schemas.oauth import Role
-from app.schemas.pagination import Pagination
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Response
+from fastapi_chat.deps.oauth import RoleChecker
+from fastapi_chat.schemas.messages import Message, MessageCreate, MessageUpdate
+from fastapi_chat.schemas.oauth import Role
+from fastapi_chat.schemas.pagination import Pagination
 
 router = APIRouter()
 

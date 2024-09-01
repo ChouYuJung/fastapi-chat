@@ -20,8 +20,8 @@ COPY ./pyproject.toml ./poetry.lock* /
 RUN poetry install --no-root && poetry show
 
 # Application
-WORKDIR /app/
-COPY ./app /app
-RUN chmod +x /app/prestart.sh /app/start.sh
+COPY ./fastapi_chat /fastapi_chat
+COPY ./prestart.sh ./start.sh /
+RUN chmod +x /prestart.sh /start.sh
 
-ENTRYPOINT ["bash", "-c", "/app/prestart.sh && /app/start.sh"]
+ENTRYPOINT ["bash", "-c", "/prestart.sh && /start.sh"]

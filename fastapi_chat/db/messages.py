@@ -1,7 +1,7 @@
 from typing import Annotated, Dict, List, Literal, Optional, Text
 
-from app.schemas.messages import Message, MessageUpdate
-from app.schemas.pagination import Pagination
+from fastapi_chat.schemas.messages import Message, MessageUpdate
+from fastapi_chat.schemas.pagination import Pagination
 
 fake_messages_db: Annotated[
     Dict[Text, List["Message"]], "conversation_id: messages"

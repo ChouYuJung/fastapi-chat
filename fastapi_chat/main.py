@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
 
     # <SET_APP_STATE>
     # <SET_DB>
-    from app.db._base import DatabaseBase
+    from fastapi_chat.db._base import DatabaseBase
 
     _db = DatabaseBase.from_url(settings.DB_URL)
     logger.info(f"Connected to database: {_db}")
@@ -80,6 +80,7 @@ def create_app():
 
     app.include_router(api_router)
 
+    print(app.routes)
     return app
 
 

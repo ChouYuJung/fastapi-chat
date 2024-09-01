@@ -1,15 +1,15 @@
 from typing import TYPE_CHECKING, Literal, Optional, Sequence, Text
 
-from app.schemas.conversations import (
+from fastapi_chat.schemas.conversations import (
     ConversationCreate,
     ConversationInDB,
     ConversationUpdate,
 )
-from app.schemas.pagination import Pagination
-from app.utils.common import run_as_coro
+from fastapi_chat.schemas.pagination import Pagination
+from fastapi_chat.utils.common import run_as_coro
 
 if TYPE_CHECKING:
-    from app.db._base import DatabaseBase
+    from fastapi_chat.db._base import DatabaseBase
 
 
 async def create_conversation(

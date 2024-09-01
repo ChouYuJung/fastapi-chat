@@ -1,13 +1,13 @@
 from typing import TYPE_CHECKING, Literal, Optional, Sequence, Text
 
-from app.schemas.pagination import Pagination
-from app.utils.common import run_as_coro
+from fastapi_chat.schemas.pagination import Pagination
+from fastapi_chat.utils.common import run_as_coro
 
 from ..schemas.roles import Role
 from ..schemas.users import UserCreate, UserInDB, UserUpdate
 
 if TYPE_CHECKING:
-    from app.db._base import DatabaseBase
+    from fastapi_chat.db._base import DatabaseBase
 
 
 async def get_user(db: "DatabaseBase", *, username: Text) -> Optional["UserInDB"]:

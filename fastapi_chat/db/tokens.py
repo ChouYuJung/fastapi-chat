@@ -1,10 +1,10 @@
 from typing import TYPE_CHECKING, Optional, Text
 
-from app.utils.common import run_as_coro
+from fastapi_chat.utils.common import run_as_coro
 
 if TYPE_CHECKING:
-    from app.db._base import DatabaseBase
-    from app.schemas.oauth import Token, TokenInDB
+    from fastapi_chat.db._base import DatabaseBase
+    from fastapi_chat.schemas.oauth import Token, TokenInDB
 
 
 async def caching_token(

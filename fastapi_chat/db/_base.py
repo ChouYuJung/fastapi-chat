@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Literal, Optional, Sequence, Text
 from yarl import URL
 
 if TYPE_CHECKING:
-    from app.schemas.conversations import (
+    from fastapi_chat.schemas.conversations import (
         ConversationCreate,
         ConversationInDB,
         ConversationUpdate,
@@ -25,7 +25,7 @@ class DatabaseBase:
 
     @classmethod
     def from_url(cls, url: URL | Text | None):
-        from app.db._memory import DatabaseMemory
+        from fastapi_chat.db._memory import DatabaseMemory
 
         db: DatabaseBase
         if url is None:

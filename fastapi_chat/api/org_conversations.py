@@ -1,26 +1,27 @@
 from typing import Annotated, Literal, Optional, Text
 
-from app.db._base import DatabaseBase
-from app.db.conversations import (
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Path as QueryPath
+from fastapi import Query, Response, status
+
+from fastapi_chat.db._base import DatabaseBase
+from fastapi_chat.db.conversations import (
     create_conversation,
     delete_conversation,
     list_conversations,
     retrieve_conversation,
     update_conversation,
 )
-from app.deps.db import depend_db
-from app.deps.oauth import TYPE_TOKEN_PAYLOAD_DATA_USER_ORG
-from app.deps.oauth import Permission as Per
-from app.deps.oauth import UserPermissionChecker
-from app.schemas.conversations import (
+from fastapi_chat.deps.db import depend_db
+from fastapi_chat.deps.oauth import TYPE_TOKEN_PAYLOAD_DATA_USER_ORG
+from fastapi_chat.deps.oauth import Permission as Per
+from fastapi_chat.deps.oauth import UserPermissionChecker
+from fastapi_chat.schemas.conversations import (
     Conversation,
     ConversationCreate,
     ConversationUpdate,
 )
-from app.schemas.pagination import Pagination
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi import Path as QueryPath
-from fastapi import Query, Response, status
+from fastapi_chat.schemas.pagination import Pagination
 
 router = APIRouter()
 

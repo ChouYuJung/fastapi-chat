@@ -19,7 +19,8 @@ from typing import (
 )
 
 import psutil
-from app.schemas import JSONSerializable
+
+from fastapi_chat.schemas import JSONSerializable
 
 T = TypeVar("T")
 P = ParamSpec("P")

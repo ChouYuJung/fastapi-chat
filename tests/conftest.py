@@ -1,6 +1,7 @@
 import pytest
-from app.main import app
 from fastapi.testclient import TestClient
+
+from fastapi_chat.main import app
 
 
 @pytest.fixture(scope="module")

@@ -1,7 +1,8 @@
 from typing import Dict, Optional, Text, TypedDict
 
-from app.schemas.oauth import Token, User
 from fastapi.testclient import TestClient
+
+from fastapi_chat.schemas.oauth import Token, User
 
 
 def get_token(
